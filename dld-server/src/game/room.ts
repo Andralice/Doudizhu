@@ -1,10 +1,11 @@
 import { createPlayer, PlayerInfo } from './player';
 import { createInitialState, GameState, GamePhase, PlayerRole } from './state';
+import type { AIPlayer } from '../ai';
 
 export interface RoomSummary {
   roomId: string;
   playerCount: number;
-  players: { name: string; seat: number }[];
+  players: { name: string; seat: number; isAI: boolean }[];
   phase: GamePhase;
 }
 
@@ -19,16 +20,15 @@ export class Room {
     this.game = createInitialState(id);
   }
 
-  addPlayer(playerId: string, name: string): { success: boolean; seat?: number; error?: string } {
+  addPlayer(playerId: string, name: string, isAI = false, aiPlayer?: AIPlayer): { success: boolean; seat?: number; error?: string } {
     if (this.isFull()) {
       return { success: false, error: '房间已满' };
     }
-    // Find first empty seat
     const seat = this.players.findIndex((p) => p === null);
     if (seat === -1) {
       return { success: false, error: '没有空位' };
     }
-    const player = createPlayer(playerId, name);
+    const player = createPlayer(playerId, name, isAI, aiPlayer);
     player.seat = seat;
     this.players[seat] = player;
     return { success: true, seat };
@@ -37,6 +37,8 @@ export class Room {
   removePlayer(playerId: string): number | null {
     const idx = this.players.findIndex((p) => p?.id === playerId);
     if (idx === -1) return null;
+    // Don't allow removing AI players
+    if (this.players[idx]?.isAI) return null;
     this.players[idx] = null;
     return idx;
   }
@@ -60,11 +62,11 @@ export class Room {
   }
 
   allPlayersOnline(): boolean {
-    return this.players.every((p) => p && p.online);
+    return this.players.every((p) => p && (p.online || p.isAI));
   }
 
   allReady(): boolean {
-    return this.players.every((p) => p && p.ready);
+    return this.players.every((p) => p && (p.ready || p.isAI));
   }
 
   playerCount(): number {
@@ -76,7 +78,11 @@ export class Room {
   }
 
   isEmpty(): boolean {
-    return this.players.every((p) => p === null);
+    return this.players.every((p) => p === null || p?.isAI);
+  }
+
+  humanCount(): number {
+    return this.players.filter((p) => p !== null && !p.isAI).length;
   }
 
   getSummary(): RoomSummary {
@@ -85,7 +91,7 @@ export class Room {
       playerCount: this.playerCount(),
       players: this.players
         .filter((p) => p !== null)
-        .map((p) => ({ name: p!.name, seat: p!.seat })),
+        .map((p) => ({ name: p!.name, seat: p!.seat, isAI: p!.isAI })),
       phase: this.game.phase,
     };
   }

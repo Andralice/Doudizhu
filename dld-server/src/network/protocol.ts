@@ -10,6 +10,7 @@ export const C2S = {
   CREATE_ROOM: 'create_room',
   JOIN_ROOM: 'join_room',
   LEAVE_ROOM: 'leave_room',
+  ADD_AI: 'add_ai',
   READY: 'ready',
   BID: 'bid',
   DOUBLE: 'double',

@@ -4,8 +4,8 @@ $ErrorActionPreference = "Continue"
 
 $SSH_KEY = "$env:USERPROFILE\.ssh\id_ed25519"
 $SERVER = "alice@154.8.213.134"
-$REMOTE_DIR = "/opt/dld-server"
-$PORT = 8080
+$REMOTE_DIR = "~/dld-server"
+$PORT = 8088
 
 # DeepSeek AI 配置
 $DEEPSEEK_API_KEY = "sk-96def72c5c264af98e3057581f5352dc"
@@ -71,6 +71,6 @@ Write-Host ""
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  部署完成" -ForegroundColor Green
-Write-Host "  游戏地址: http://154.8.213.134:${PORT}" -ForegroundColor Cyan
-Write-Host "  WebSocket: ws://154.8.213.134:${PORT}" -ForegroundColor Cyan
+Write-Host "  游戏地址: http://154.8.213.134:8088" -ForegroundColor Cyan
+Write-Host "  WebSocket: ws://154.8.213.134:8088" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan

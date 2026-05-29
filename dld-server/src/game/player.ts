@@ -1,19 +1,25 @@
+import type { AIPlayer } from '../ai';
+
 export interface PlayerInfo {
   id: string;
   name: string;
-  seat: number; // 0, 1, 2
-  hand: number[]; // cards in hand
+  seat: number;
+  hand: number[];
   online: boolean;
   ready: boolean;
+  isAI: boolean;
+  aiPlayer?: AIPlayer; // non-null for AI players
 }
 
-export function createPlayer(id: string, name: string): PlayerInfo {
+export function createPlayer(id: string, name: string, isAI = false, aiPlayer?: AIPlayer): PlayerInfo {
   return {
     id,
     name,
     seat: -1,
     hand: [],
-    online: true,
-    ready: false,
+    online: !isAI, // AI is always "online"
+    ready: !isAI, // AI is always ready
+    isAI,
+    aiPlayer,
   };
 }
