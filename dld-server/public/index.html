@@ -20,15 +20,15 @@
       </div>
       <!-- Login form -->
       <div id="form-login">
-        <div class="field"><label>账号</label><input id="login-acc" placeholder="输入账号" maxlength="20" onkeyup="if(event.key==='Enter')doLogin()"></div>
-        <button class="btn primary full" id="login-btn" onclick="doLogin()">登录</button>
+        <div class="field"><input id="login-acc" placeholder="输入账号" maxlength="20" onkeyup="if(event.key==='Enter')doLogin()"></div>
+        <button class="btn primary auth-btn" id="login-btn" onclick="doLogin()">登录</button>
         <p id="login-err" class="err"></p>
       </div>
       <!-- Register form -->
       <div id="form-register" style="display:none">
-        <div class="field"><label>账号</label><input id="reg-acc" placeholder="设置登录账号" maxlength="20"></div>
-        <div class="field"><label>昵称</label><input id="reg-name" placeholder="游戏内显示的名称" maxlength="8" onkeyup="if(event.key==='Enter')doRegister()"></div>
-        <button class="btn primary full" id="reg-btn" onclick="doRegister()">注册并进入</button>
+        <div class="field"><input id="reg-acc" placeholder="设置登录账号" maxlength="20"></div>
+        <div class="field"><input id="reg-name" placeholder="游戏昵称" maxlength="8" onkeyup="if(event.key==='Enter')doRegister()"></div>
+        <button class="btn primary auth-btn" id="reg-btn" onclick="doRegister()">注册并进入</button>
         <p id="reg-err" class="err"></p>
       </div>
       <p id="auth-auto" class="hint" style="display:none">自动登录中...</p>
