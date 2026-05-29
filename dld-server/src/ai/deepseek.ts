@@ -282,8 +282,7 @@ export class DeepSeekPlayer {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.2, max_tokens: 500,
-        response_format: { type: 'json_object' },
+        temperature: 0.3, max_tokens: 400,
       }),
     });
     clearTimeout(timeout);
@@ -291,7 +290,7 @@ export class DeepSeekPlayer {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = (await response.json()) as any;
     const content = data.choices?.[0]?.message?.content || '{}';
-
+    console.log(`[AI] DeepSeek raw: ${content.slice(0,250)}`);
     return this.parseDecision(content, hand);
   }
 
