@@ -236,6 +236,11 @@ export class Client {
       type: S2C.PLAYER_READY,
       payload: { seat: player.seat, playerName: s.playerName, ready: newReady, players: this.hub.buildPlayerListPayload(room) },
     });
+
+    // Check if game should start (all 3 players ready)
+    if (room.isFull() && room.allReady()) {
+      setTimeout(() => this.hub.tryStartGame(room.id), 400);
+    }
   }
 
   // ---- Game Actions ----

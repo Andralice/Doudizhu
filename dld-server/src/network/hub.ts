@@ -311,6 +311,7 @@ export class Hub {
   tryStartGame(roomId: string) {
     const game = this.games.get(roomId);
     if (!game) return;
+    if (game.state.phase !== 'waiting') return; // already started
     const { events, error } = game.startGame();
     if (error) return;
 
