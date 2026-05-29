@@ -248,7 +248,7 @@ function renderGame(){
     tx('my-count',s.hand.length+'张');
 
     // Fan cards (overlapping)
-    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="tcStart(event,'+c+')" onclick="toggleCard('+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span></div>'}).join('');
+    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="tcStart(event,'+c+')" onclick="toggleCard('+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span><span class="st-big '+d.cls+'">'+d.suit+'</span></div>'}).join('');
     dp('hand-wrap',s.hand.length>0?'block':'none');
 
     // Played cards
