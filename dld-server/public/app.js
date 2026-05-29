@@ -74,7 +74,17 @@ function handle(m){
     case'no_bidder':st.showBid=false;toast('无人叫地主，重发','info');break;
     case'bid_result':
       st.showBid=false;st.landlord=p.landlordSeat;st.score=p.baseScore;st.bottom=p.bottomCards||[];
-      st.phase='doubling';st.phaseText=p.landlordName+' 地主 · 加倍阶段';
+      st.phase='grabbing';st.phaseText=p.landlordName+' 暂为地主 · 抢地主阶段';break;
+    case'grab_turn':
+      st.turn=p.seat;st.phase='grabbing';
+      if(p.seat===st.mySeat){st.showBid=true;st.bidMsg='是否抢地主？(当前地主: 座位'+(p.landlordSeat+1)+')';st.bidCur=0}
+      else{st.showBid=false;st.phaseText='抢地主中 · 当前地主: 座位'+(p.landlordSeat+1)}break;
+    case'grab_update':
+      if(p.passed)st.phaseText='座位'+(p.seat+1)+': 不抢';
+      else{st.landlord=p.newLandlordSeat;st.score=p.baseScore;st.phaseText='座位'+(p.seat+1)+': 抢地主！底分×2'};break;
+    case'grab_result':
+      st.showBid=false;st.landlord=p.landlordSeat;st.bottom=p.bottomCards||[];st.score=p.baseScore;
+      st.phase='doubling';st.phaseText=p.landlordName+' 是地主 · 加倍阶段';
       if(p.landlordSeat===st.mySeat&&p.bottomCards)st.hand=sortH(st.hand.concat(p.bottomCards));break;
     case'double_turn':
       st.turn=p.seat;st.phase='doubling';
@@ -152,6 +162,7 @@ function doPlay(){
 function doPass(){if(st.phase!=='playing')return;send('pass')}
 function doHint(){send('hint')}
 function doBid(s){send('bid',{score:s});st.showBid=false;up()}
+function doGrab(g){send('grab',{grab:g});st.showBid=false;up()}
 function doDouble(l){send('double',{level:l});st.showDouble=false;up()}
 function doContinue(){st.showResult=false;send('ready',{ready:true});st.ready=true;st.screen='room';up()}
 
@@ -182,6 +193,14 @@ function up(){
   // Home
   dp('scr-home',s.screen==='home'?'block':'none');
   if(s.screen==='home'){
+    // Fetch room list
+    fetch('/rooms').then(function(r){return r.json()}).then(function(rooms){
+      var rl=$('rooms-list');if(!rl)return;
+      var waiting=rooms.filter(function(r){return r.phase==='waiting'});
+      if(waiting.length===0)rl.innerHTML='<p class="dim sm">暂无开放房间，创建一个吧</p>';
+      else rl.innerHTML=waiting.map(function(r){return'<div class="item"><span class="det">房间 '+r.roomId+'</span><span>'+r.playerCount+'/3人</span><button class="btn primary sm" onclick="st.joinId=\''+r.roomId+'\';doJoinRoom()">加入</button></div>'}).join('');
+    }).catch(function(){});
+
     tx('home-user',s.name+' · '+s.acc);
     var sp=$('stats-panel'),si=$('stats-info');
     if(sp&&si){
@@ -238,8 +257,9 @@ function renderGame(){
     hm('pz-mine',s.myPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'">'+d.rank+d.suit+'</span>'}).join(''));
 
     var th=$('turn-hint');if(th){
-      if(s.phase==='bidding')th.textContent=s.turn===s.mySeat?'轮到你叫地主':s.turn!==null?'等待其他玩家叫地主...':'';
-      else if(s.phase==='doubling')th.textContent=s.turn===s.mySeat?'轮到你加倍':s.turn!==null?'等待其他玩家加倍...':'';
+      if(s.phase==='bidding')th.textContent=s.turn===s.mySeat?'轮到你叫地主':s.turn!==null?'等待叫地主...':'';
+      else if(s.phase==='grabbing')th.textContent=s.turn===s.mySeat?'轮到你抢地主':s.turn!==null?'等待抢地主...':'';
+      else if(s.phase==='doubling')th.textContent=s.turn===s.mySeat?'轮到你加倍':s.turn!==null?'等待加倍...':'';
       else if(s.phase==='playing')th.textContent=s.turn===s.mySeat?'轮到你出牌':s.turn!==null?'等待 '+gpn(s.turn)+' 出牌...':'';
       else th.textContent='';
     }
@@ -251,7 +271,16 @@ function renderGame(){
     if(hintBtn)hintBtn.disabled=!isMyTurn;
 
     dp('ov-bid',s.showBid?'flex':'none');
-    if(s.showBid){tx('bid-msg',s.bidMsg);document.querySelectorAll('#ov-bid .btn').forEach(function(b){var sc=parseInt(b.textContent);if(sc>0)b.disabled=sc<=s.bidCur})}
+    if(s.showBid){
+      tx('bid-msg',s.bidMsg);
+      var ovBox=document.querySelector('#ov-bid .ov-btns');
+      if(s.phase==='grabbing'){
+        if(ovBox)ovBox.innerHTML='<button class="btn secondary" onclick="doGrab(false)">不抢</button><button class="btn danger" onclick="doGrab(true)">抢地主</button>';
+      }else{
+        if(ovBox)ovBox.innerHTML='<button class="btn secondary" onclick="doBid(0)">不叫</button><button class="btn primary" onclick="doBid(1)">1分</button><button class="btn primary" onclick="doBid(2)">2分</button><button class="btn danger" onclick="doBid(3)">3分</button>';
+        document.querySelectorAll('#ov-bid .btn').forEach(function(b){var sc=parseInt(b.textContent);if(sc>0)b.disabled=sc<=s.bidCur});
+      }
+    }
     dp('ov-double',s.showDouble?'flex':'none');
     dp('ov-result',s.showResult?'flex':'none');
     if(s.showResult){tx('res-title',s.resTitle);tx('res-detail',s.resDetail)}
@@ -296,4 +325,4 @@ window.switchTab=switchTab;window.doRegister=doRegister;window.doLogin=doLogin;w
 window.doCreateRoom=doCreateRoom;window.doJoinRoom=doJoinRoom;window.doLeaveRoom=doLeaveRoom;
 window.doAddAI=doAddAI;window.doToggleReady=doToggleReady;window.tcStart=tcStart;
 window.toggleCard=toggleCard;window.doPlay=doPlay;window.doPass=doPass;window.doHint=doHint;
-window.doBid=doBid;window.doDouble=doDouble;window.doContinue=doContinue;
+window.doBid=doBid;window.doGrab=doGrab;window.doDouble=doDouble;window.doContinue=doContinue;

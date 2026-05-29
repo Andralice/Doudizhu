@@ -95,6 +95,7 @@ export class Client {
       case C2S.ADD_AI: return this.handleAddAI();
       case C2S.READY: return this.handleReady(payload);
       case C2S.BID: return this.handleBid(payload);
+      case 'grab': return this.handleGrab(payload);
       case C2S.DOUBLE: return this.handleDouble(payload);
       case C2S.PLAY: return this.handlePlay(payload);
       case C2S.PASS: return this.handlePass();
@@ -269,6 +270,16 @@ export class Client {
   }
 
   // ---- Game Actions ----
+
+  private handleGrab(payload: any) {
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
+    const wantGrab = payload?.grab ?? false;
+    const { events, error } = game.grab(s.playerId, wantGrab);
+    if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
+    this.dispatchEvents(game.room, events);
+  }
 
   private handleBid(payload: any) {
     const s = this.state!;

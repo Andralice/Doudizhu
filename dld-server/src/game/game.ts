@@ -14,6 +14,8 @@ const PLAY_TIMEOUT_MS = 60000;
 
 export class GameManager {
   room: Room;
+  private bidTurnCount = 0;
+  private grabCount = 0;
 
   constructor(room: Room) {
     this.room = room;
@@ -46,7 +48,7 @@ export class GameManager {
       ...room.game,
       phase: GamePhase.Bidding,
       bottomCards: bottom,
-      baseScore: 1,
+      baseScore: 0,
       multiplier: 1,
     };
 
@@ -84,78 +86,44 @@ export class GameManager {
       return { events: [], error: `叫分必须大于当前最高分 ${currentScore}` };
     }
 
+    this.bidTurnCount++;
     const events: GameEvent[] = [];
 
     if (score > 0) {
       state.baseScore = score;
       state.landlordSeat = player.seat;
-      events.push({
-        type: 'bid_update',
-        payload: { seat: player.seat, score, currentMaxScore: score },
-      });
+      events.push({ type: 'bid_update', payload: { seat: player.seat, score, currentMaxScore: score } });
     } else {
-      events.push({
-        type: 'bid_update',
-        payload: { seat: player.seat, score: 0, currentMaxScore: state.baseScore },
-      });
+      events.push({ type: 'bid_update', payload: { seat: player.seat, score: 0, currentMaxScore: state.baseScore } });
     }
 
-    // Check if bidding is over
-    // Bidding ends when:
-    // 1. Someone bid 3 (max), OR
-    // 2. All 3 players have bid and someone has bid > 0
-    // 3. All 3 players passed (no one bid) — need re-deal
-    const bidCount = this.countPlayersWhoBid();
-    const nextSeat = (player.seat + 1) % 3;
-
     if (score === 3) {
-      // Immediate end, landlord is this player
       return this.finishBidding(events);
     }
 
-    if (bidCount >= 3) {
+    if (this.bidTurnCount >= 3) {
       if (state.landlordSeat !== null) {
         return this.finishBidding(events);
       } else {
-        // No one bid — re-deal
         events.push({ type: 'no_bidder', payload: { message: '无人叫地主，重新发牌' } });
         state.phase = GamePhase.Waiting;
         state.currentTurnSeat = null;
-        return { events, error: undefined };
+        this.bidTurnCount = 0;
+        return { events };
       }
     }
 
-    // Continue bidding
+    const nextSeat = (player.seat + 1) % 3;
     state.currentTurnSeat = nextSeat;
-    events.push({
-      type: 'bid_turn',
-      payload: { seat: nextSeat, currentScore: state.baseScore, maxScore: 3 },
-    });
+    events.push({ type: 'bid_turn', payload: { seat: nextSeat, currentScore: state.baseScore } });
 
     return { events };
-  }
-
-  private countPlayersWhoBid(): number {
-    // Count players who have bid (we track this by checking if the bidding has gone around)
-    // Simplified: we use baseScore tracking - if baseScore > 0, at least one person bid
-    return this.room.players.filter((p) => p !== null).length;
   }
 
   private finishBidding(prevEvents: GameEvent[]): { events: GameEvent[] } {
     const state = this.state;
     const landlordSeat = state.landlordSeat!;
 
-    // Give bottom cards to landlord
-    const landlord = this.room.getPlayerBySeat(landlordSeat)!;
-    landlord.hand = sortCards([...landlord.hand, ...state.bottomCards]);
-
-    // Set roles
-    for (let i = 0; i < 3; i++) {
-      const p = this.room.players[i]!;
-      // We track role through the game state
-    }
-
-    state.phase = GamePhase.Doubling;
     prevEvents.push({
       type: 'bid_result',
       payload: {
@@ -166,12 +134,95 @@ export class GameManager {
       },
     });
 
-    // Start doubling phase
+    this.bidTurnCount = 0;
+    // Start grabbing phase: next player after landlord can grab
+    state.phase = GamePhase.Grabbing;
+    const grabStartSeat = (landlordSeat + 1) % 3;
+    state.currentTurnSeat = grabStartSeat;
+    prevEvents.push({
+      type: 'grab_turn',
+      payload: { seat: grabStartSeat, landlordSeat, message: '是否抢地主?' },
+    });
+
+    return { events: prevEvents };
+  }
+
+  // ---- Grabbing Phase ----
+
+  grab(playerId: string, wantGrab: boolean): { events: GameEvent[]; error?: string } {
+    const state = this.state;
+    if (state.phase !== GamePhase.Grabbing) {
+      return { events: [], error: '不在抢地主阶段' };
+    }
+
+    const player = this.room.getPlayer(playerId);
+    if (!player) return { events: [], error: '玩家不存在' };
+    if (player.seat !== state.currentTurnSeat) {
+      return { events: [], error: '还没轮到你抢地主' };
+    }
+    if (player.seat === state.landlordSeat) {
+      return { events: [], error: '地主不能抢地主' };
+    }
+
+    const events: GameEvent[] = [];
+    this.grabCount++;
+
+    if (wantGrab) {
+      state.landlordSeat = player.seat;
+      state.baseScore *= 2;
+      events.push({
+        type: 'grab_update',
+        payload: { seat: player.seat, newLandlordSeat: player.seat, baseScore: state.baseScore, grabbed: true },
+      });
+    } else {
+      events.push({
+        type: 'grab_update',
+        payload: { seat: player.seat, passed: true },
+      });
+    }
+
+    // After 2 farmers have responded, end grabbing
+    if (this.grabCount >= 2) {
+      return this.finishGrabbing(events);
+    }
+
+    // Next farmer
+    const nextSeat = (player.seat + 1) % 3;
+    // Skip the landlord
+    const finalNext = nextSeat === state.landlordSeat ? (nextSeat + 1) % 3 : nextSeat;
+    state.currentTurnSeat = finalNext;
+
+    events.push({
+      type: 'grab_turn',
+      payload: { seat: finalNext, landlordSeat: state.landlordSeat },
+    });
+
+    return { events };
+  }
+
+  private finishGrabbing(prevEvents: GameEvent[]): { events: GameEvent[] } {
+    const state = this.state;
+    const landlordSeat = state.landlordSeat!;
+    this.grabCount = 0;
+
+    // Give bottom cards to final landlord
+    const landlord = this.room.getPlayerBySeat(landlordSeat)!;
+    landlord.hand = sortCards([...landlord.hand, ...state.bottomCards]);
+
+    state.phase = GamePhase.Doubling;
+    prevEvents.push({
+      type: 'grab_result',
+      payload: {
+        landlordSeat, landlordName: landlord.name,
+        bottomCards: state.bottomCards, baseScore: state.baseScore,
+      },
+    });
+
+    state.currentTurnSeat = landlordSeat;
     prevEvents.push({
       type: 'double_turn',
-      payload: { seat: landlordSeat, message: '请选择是否加倍' },
+      payload: { seat: landlordSeat },
     });
-    state.currentTurnSeat = landlordSeat;
 
     return { events: prevEvents };
   }

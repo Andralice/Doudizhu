@@ -193,12 +193,14 @@ const SYSTEM_PROMPT = `你是一个专业的斗地主AI玩家。你精通算牌�
 - 地主赢 = 地主先出完
 - 农民赢 = 任一农民先出完（两个农民算一边）
 
-## 策略原则
-- 记牌算牌: 一副牌54张，关注已出的关键牌（2/王/A），推断对手可能持有的牌
-- 控制牌权: 尽量用最小的牌赢下当前轮，保留大牌
-- 农民配合: 如果你是农民，队友出大牌时尽量不压
-- 炸弹时机: 手牌少时果断使用炸弹拿回牌权
-- 地主策略: 尽快清掉单张和小对子，用大牌压制农民`;
+## 核心目标：赢得胜利！
+- 你赢的条件：自己手牌出完 = 赢。如果你是农民，队友先出完也算你赢！
+- 不要一味压牌！有时放过队友让他出牌更重要
+- 如果你是地主：尽快清掉单张和小对子，压制农民
+- 如果你是农民：队友出牌时，除非必要不要压
+- 手牌≤3张时，毫不犹豫用炸弹拿回牌权清空手牌
+- 新一轮优先出小单张或小对子拆掉弱牌
+- 算牌：关注已出的2/王/A，推断剩余威胁`;
 
 // ============================================================
 // DeepSeek Player — 完整决策AI
@@ -245,27 +247,16 @@ export class DeepSeekPlayer {
       return this.fallbackDecide(hand, lastPlay, isNewRound);
     }
 
-    // Try DeepSeek (with retries)
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const decision = await this.callDeepSeek(hand, lastPlay, seat, isNewRound);
-
-        // Validate decision
-        const validation = this.validateDecision(hand, lastPlay, isNewRound, decision);
-        if (validation.valid) {
-          return decision;
-        }
-
-        // On invalid, include error in next attempt
-        if (attempt === 0) {
-          console.log(`[AI] DeepSeek 返回无效决策: ${validation.error}，重试中...`);
-        }
-      } catch (err: any) {
-        console.log(`[AI] DeepSeek API 错误: ${err.message}，${attempt === 0 ? '重试中...' : '使用后备AI'}`);
-      }
+    // Try DeepSeek (single attempt)
+    try {
+      const decision = await this.callDeepSeek(hand, lastPlay, seat, isNewRound);
+      const validation = this.validateDecision(hand, lastPlay, isNewRound, decision);
+      if (validation.valid) return decision;
+      console.log(`[AI] Invalid decision: ${validation.error}, using fallback`);
+    } catch (err: any) {
+      console.log(`[AI] API error: ${err.message}, using fallback`);
     }
 
-    // Fallback
     return this.fallbackDecide(hand, lastPlay, isNewRound);
   }
 
@@ -279,28 +270,25 @@ export class DeepSeekPlayer {
   ): Promise<AIDecision> {
     const userMessage = this.buildGameStateMessage(hand, lastPlay, seat, isNewRound);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      signal: controller.signal,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
       body: JSON.stringify({
         model: this.model,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.2,
-        max_tokens: 600,
+        temperature: 0.2, max_tokens: 500,
         response_format: { type: 'json_object' },
       }),
     });
+    clearTimeout(timeout);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text().catch(() => '')}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = (await response.json()) as any;
     const content = data.choices?.[0]?.message?.content || '{}';
 

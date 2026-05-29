@@ -8,7 +8,7 @@ import { hasAnyPlay } from '../engine/hand';
 const ROOM_ID_CHARS = '0123456789';
 const ROOM_ID_LENGTH = 6;
 
-const AI_DELAY_MS = 1500;
+const AI_DELAY_MS = 800;
 const AI_NAMES = ['阿尔法', '贝塔', '伽马', '冷锋', '战狼', '棋圣'];
 
 let aiNameIndex = 0;
@@ -145,7 +145,7 @@ export class Hub {
     if (!game) return;
 
     const state = game.state;
-    if (state.phase !== GamePhase.Bidding && state.phase !== GamePhase.Doubling && state.phase !== GamePhase.Playing) return;
+    if (state.phase !== GamePhase.Bidding && state.phase !== GamePhase.Grabbing && state.phase !== GamePhase.Doubling && state.phase !== GamePhase.Playing) return;
 
     const currentSeat = state.currentTurnSeat;
     if (currentSeat === null) return;
@@ -189,6 +189,14 @@ export class Hub {
           } else {
             events = result.events;
           }
+          break;
+        }
+        case GamePhase.Grabbing: {
+          // AI grabs if it has strong hand
+          const grabScore = this.aiBidDecision(hand, 3);
+          const wantGrab = grabScore >= 6;
+          const gr = game.grab(player.id, wantGrab);
+          events = gr.events;
           break;
         }
         case GamePhase.Doubling: {

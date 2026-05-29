@@ -42,6 +42,7 @@
         <div><b class="title-sm">🃏 斗地主</b><p id="home-user" class="dim sm"></p></div>
         <button class="btn ghost sm" onclick="logout()">退出</button>
       </div>
+      <div class="card-panel" id="rooms-panel"><h3>开放房间</h3><div id="rooms-list" class="hlist"><p class="dim sm">加载中...</p></div></div>
       <div class="card-panel"><button class="btn primary full big" onclick="doCreateRoom()">创建新房间</button></div>
       <div class="card-panel"><h3>加入房间</h3><div class="row"><input id="join-inp" placeholder="6位房间号" maxlength="6" inputmode="numeric" onkeyup="if(event.key==='Enter')doJoinRoom()"><button class="btn secondary" onclick="doJoinRoom()">加入</button></div></div>
       <div class="card-panel" id="stats-panel"><h3>我的战绩</h3><div id="stats-info" class="stats-row"></div></div>

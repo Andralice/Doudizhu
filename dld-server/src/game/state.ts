@@ -2,6 +2,7 @@ export enum GamePhase {
   Waiting = 'waiting',
   Dealing = 'dealing',
   Bidding = 'bidding',
+  Grabbing = 'grabbing',
   Doubling = 'doubling',
   Playing = 'playing',
   Finished = 'finished',
