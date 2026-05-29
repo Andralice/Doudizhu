@@ -8,7 +8,8 @@ import { hasAnyPlay } from '../engine/hand';
 const ROOM_ID_CHARS = '0123456789';
 const ROOM_ID_LENGTH = 6;
 
-const AI_DELAY_MS = 800;
+const AI_DELAY_DEEPSEEK = 1200;
+const AI_DELAY_SIMPLE = 50;
 const AI_NAMES = ['阿尔法', '贝塔', '伽马', '冷锋', '战狼', '棋圣'];
 
 let aiNameIndex = 0;
@@ -56,14 +57,14 @@ export class Hub {
     return { success: true, room, seat: result.seat };
   }
 
-  addAI(roomId: string): { success: boolean; seat?: number; error?: string } {
+  addAI(roomId: string, aiType: 'deepseek' | 'simple' = 'deepseek'): { success: boolean; seat?: number; error?: string } {
     const room = this.rooms.get(roomId);
     if (!room) return { success: false, error: '房间不存在' };
     if (room.isFull()) return { success: false, error: '房间已满，无法添加AI' };
 
     const aiId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const aiName = nextAIName();
-    const aiPlayer = createAIPlayer(aiId, aiName, 0); // seat will be set by room
+    const aiPlayer = createAIPlayer(aiId, aiName, 0, aiType);
 
     const result = room.addPlayer(aiId, aiName, true, aiPlayer);
     if (!result.success) return { success: false, error: result.error };
@@ -153,9 +154,10 @@ export class Hub {
     const player = game.room.getPlayerBySeat(currentSeat);
     if (!player?.isAI || !player.aiPlayer) return;
 
+    const delay = player.aiPlayer?.aiType === 'simple' ? AI_DELAY_SIMPLE : AI_DELAY_DEEPSEEK;
     const timer = setTimeout(() => {
       this.processAITurn(roomId);
-    }, AI_DELAY_MS);
+    }, delay);
 
     this.aiTimers.set(roomId, timer);
   }
@@ -208,16 +210,13 @@ export class Hub {
           const isNewRound = state.lastPlaySeat === null || state.lastPlaySeat === currentSeat;
           const lastPlay = isNewRound ? null : analyze(state.lastPlayCards);
 
-          // Use DeepSeek or fallback AI
+          // Use DeepSeek or SimpleAI based on type
           let decision: { action: 'play' | 'pass'; cards: number[] };
-          const deepseek = ai.engine;
-
-          if (deepseek.isAvailable) {
-            decision = await deepseek.decide([...hand], lastPlay, currentSeat, isNewRound);
-          } else {
-            // Use SimpleAI fallback
+          if (ai.aiType === 'simple' || !ai.engine.isAvailable) {
             const cards = ai.fallback.decide([...hand], lastPlay);
             decision = { action: cards ? 'play' : 'pass', cards: cards || [] };
+          } else {
+            decision = await ai.engine.decide([...hand], lastPlay, currentSeat, isNewRound);
           }
 
           if (decision.action === 'pass' && !isNewRound) {

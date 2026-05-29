@@ -1,113 +1,139 @@
-import { value, sortCards } from '../engine/card';
-import { analyze, PlayType, PlayResult } from '../engine/rules';
-import { getHint } from '../engine/hand';
+import { value, suit, sortCards } from '../engine/card';
+import { analyze, PlayType, PlayResult, canBeat } from '../engine/rules';
 
 export interface AIStrategy {
-  aggression: number;   // 0-1, higher = more aggressive (play bigger cards)
-  bombThreshold: number; // when to use bombs (0=never, 1=immediately)
+  aggression: number;
+  bombThreshold: number;
 }
-
-const DEFAULT_STRATEGY: AIStrategy = {
-  aggression: 0.5,
-  bombThreshold: 0.7,
-};
 
 export class SimpleAI {
   strategy: AIStrategy;
 
   constructor(strategy?: Partial<AIStrategy>) {
-    this.strategy = { ...DEFAULT_STRATEGY, ...strategy };
+    this.strategy = { aggression: 0.55, bombThreshold: 0.65, ...strategy };
   }
 
   decide(hand: number[], lastPlay: PlayResult | null): number[] | null {
     const sorted = sortCards(hand);
+    if (!lastPlay) return this.playFree(sorted);
 
-    // Use hint system as baseline (smallest valid play)
-    const hintCards = getHint(sorted, lastPlay);
+    // Must beat last play
+    const sameType = this.findSameTypeBeater(sorted, lastPlay);
+    if (sameType) return sameType;
 
-    if (!hintCards) return null;
-
-    // With probability based on aggression, play bigger cards
-    if (Math.random() < this.strategy.aggression && lastPlay) {
-      const betterCards = this.findBetterPlay(sorted, lastPlay);
-      if (betterCards) return betterCards;
+    // Try bomb/rocket
+    if (this.strategy.bombThreshold > 0) {
+      const bomb = this.useBomb(sorted, lastPlay);
+      if (bomb) return bomb;
     }
 
-    return hintCards;
+    return null; // pass
   }
 
-  private findBetterPlay(hand: number[], lastPlay: PlayResult): number[] | null {
-    // Group by value to find better options
-    const groups = new Map<number, number[]>();
-    for (const c of hand) {
-      const v = value(c);
-      const g = groups.get(v);
-      if (g) g.push(c);
-      else groups.set(v, [c]);
+  private playFree(hand: number[]): number[] | null {
+    const groups = this.groupByVal(hand);
+    const vals = [...groups.keys()].sort((a, b) => a - b);
+
+    // If ≤ 2 cards left, play all
+    if (hand.length <= 2) return [...hand];
+    if (hand.length === 3) {
+      const g = [...groups.entries()];
+      if (g.length === 1) return [...hand]; // triple
+    }
+    if (hand.length === 4) {
+      const g = [...groups.entries()];
+      if (g.length === 1) return [...hand]; // bomb - don't split if last cards
+      if (g.some(([, c]) => c.length >= 3)) {
+        // Triple + 1
+        const tv = g.find(([, c]) => c.length >= 3)![0];
+        const kv = g.find(([v]) => v !== tv)![0];
+        return [...groups.get(tv)!.slice(0, 3), groups.get(kv)![0]];
+      }
     }
 
-    const sortedVals = [...groups.keys()].sort((a, b) => a - b);
+    // Play smallest single if many singles (>3)
+    const singles = vals.filter(v => groups.get(v)!.length >= 1);
+    const pairs = vals.filter(v => groups.get(v)!.length >= 2);
+    const triples = vals.filter(v => groups.get(v)!.length >= 3);
 
-    switch (lastPlay.type) {
-      case PlayType.Single: return this.betterSingle(groups, sortedVals, lastPlay);
-      case PlayType.Pair: return this.betterPair(groups, sortedVals, lastPlay);
-      case PlayType.Triple:
-      case PlayType.TripleOne:
-      case PlayType.TriplePair:
-        return this.betterTriple(hand, groups, sortedVals, lastPlay);
-      case PlayType.Straight:
-        return this.betterStraight(hand, groups, sortedVals, lastPlay);
-      default:
+    if (singles.length >= 4 && hand.length > 8) {
+      const sv = singles[0];
+      return [groups.get(sv)![0]];
+    }
+
+    // Play smallest pair if we have several
+    if (pairs.length >= 3) {
+      const pv = pairs[0];
+      return groups.get(pv)!.slice(0, 2);
+    }
+
+    // Play triple+1 if available
+    if (triples.length > 0 && hand.length > 6) {
+      const tv = triples[0];
+      const cards = groups.get(tv)!.slice(0, 3);
+      const kicker = vals.find(v => v !== tv && groups.get(v)!.length >= 1);
+      if (kicker) return [...cards, groups.get(kicker)![0]];
+      return cards;
+    }
+
+    // Play smallest single
+    const sv = singles[0];
+    return [groups.get(sv)![0]];
+  }
+
+  private findSameTypeBeater(hand: number[], last: PlayResult): number[] | null {
+    const groups = this.groupByVal(hand);
+    const vals = [...groups.keys()].sort((a, b) => a - b);
+
+    switch (last.type) {
+      case PlayType.Single:
+        const biggerSingle = vals.find(v => v > last.mainValue && groups.get(v)!.length >= 1);
+        if (biggerSingle) return [groups.get(biggerSingle)![0]];
         return null;
+
+      case PlayType.Pair:
+        const biggerPair = vals.find(v => v > last.mainValue && groups.get(v)!.length >= 2);
+        if (biggerPair) return groups.get(biggerPair)!.slice(0, 2);
+        return null;
+
+      case PlayType.Triple:
+        const biggerT = vals.find(v => v > last.mainValue && groups.get(v)!.length >= 3);
+        if (biggerT) return groups.get(biggerT)!.slice(0, 3);
+        return null;
+
+      case PlayType.TripleOne: {
+        const bt = vals.find(v => v > last.mainValue && groups.get(v)!.length >= 3);
+        if (!bt) return null;
+        const kicker = vals.find(v => v !== bt && groups.get(v)!.length >= 1);
+        if (!kicker) return null;
+        return [...groups.get(bt)!.slice(0, 3), groups.get(kicker)![0]];
+      }
+
+      case PlayType.TriplePair: {
+        const bt = vals.find(v => v > last.mainValue && groups.get(v)!.length >= 3);
+        if (!bt) return null;
+        const kicker = vals.find(v => v !== bt && groups.get(v)!.length >= 2);
+        if (!kicker) return null;
+        return [...groups.get(bt)!.slice(0, 3), ...groups.get(kicker)!.slice(0, 2)];
+      }
+
+      case PlayType.Straight:
+        return this.beatStraight(hand, groups, last);
+
+      case PlayType.ConsecPair:
+        return this.beatConsecPairs(hand, groups, last);
+
+      default:
+        // For complex types, try all possible plays
+        return this.bruteForce(hand, last);
     }
   }
 
-  private betterSingle(groups: Map<number, number[]>, vals: number[], lastPlay: PlayResult): number[] | null {
-    // If close to winning, play highest single
-    const bigger = vals.filter((v) => v > lastPlay.mainValue).sort((a, b) => b - a);
-    if (bigger.length === 0) return null;
-    // Bias toward higher values based on aggression
-    const idx = Math.floor(Math.random() * bigger.length * (1 - this.strategy.aggression));
-    const v = bigger[Math.max(0, Math.min(idx, bigger.length - 1))];
-    return [groups.get(v)![0]];
-  }
-
-  private betterPair(groups: Map<number, number[]>, vals: number[], lastPlay: PlayResult): number[] | null {
-    const bigger = vals.filter((v) => v > lastPlay.mainValue && groups.get(v)!.length >= 2);
-    if (bigger.length === 0) return null;
-    const idx = Math.floor(Math.random() * bigger.length * (1 - this.strategy.aggression));
-    const v = bigger[Math.max(0, Math.min(idx, bigger.length - 1))];
-    const cards = groups.get(v)!;
-    return cards.slice(0, 2);
-  }
-
-  private betterTriple(hand: number[], groups: Map<number, number[]>, vals: number[], lastPlay: PlayResult): number[] | null {
-    const bigger = vals.filter((v) => v > lastPlay.mainValue && groups.get(v)!.length >= 3);
-    if (bigger.length === 0) return null;
-    const v = bigger[bigger.length - 1]; // Play highest triple
-    const cards = groups.get(v)!.slice(0, 3);
-
-    // Add kicker if needed
-    if (lastPlay.type === PlayType.TripleOne) {
-      const kicker = this.findKicker(hand, v, 1);
-      if (kicker) return [...cards, ...kicker];
-      return null;
-    }
-    if (lastPlay.type === PlayType.TriplePair) {
-      const kicker = this.findKicker(hand, v, 2);
-      if (kicker) return [...cards, ...kicker];
-      return null;
-    }
-    return cards;
-  }
-
-  private betterStraight(hand: number[], groups: Map<number, number[]>, vals: number[], lastPlay: PlayResult): number[] | null {
-    const length = lastPlay.chainLength;
-    // Find a higher straight of same length
-    for (let start = lastPlay.mainValue - length + 2; start <= 14 - length + 1; start++) {
-      const end = start + length - 1;
-      if (end <= lastPlay.mainValue) continue;
-      if (end > 14) break;
+  private beatStraight(hand: number[], groups: Map<number, number[]>, last: PlayResult): number[] | null {
+    const len = last.chainLength;
+    for (let start = last.mainValue - len + 2; start <= 14 - len + 1; start++) {
+      const end = start + len - 1;
+      if (end <= last.mainValue || end > 14) continue;
       const cards: number[] = [];
       let valid = true;
       for (let v = start; v <= end; v++) {
@@ -120,31 +146,83 @@ export class SimpleAI {
     return null;
   }
 
-  private findKicker(hand: number[], excludeVal: number, count: number): number[] | null {
-    const kickers: number[] = [];
-    const groups = new Map<number, number[]>();
-    for (const c of hand) {
-      const v = value(c);
-      if (v === excludeVal) continue;
-      const g = groups.get(v);
-      if (g) g.push(c);
-      else groups.set(v, [c]);
+  private beatConsecPairs(hand: number[], groups: Map<number, number[]>, last: PlayResult): number[] | null {
+    const len = last.chainLength;
+    for (let start = last.mainValue - len + 2; start <= 14 - len + 1; start++) {
+      const end = start + len - 1;
+      if (end <= last.mainValue || end > 14) continue;
+      const cards: number[] = [];
+      let valid = true;
+      for (let v = start; v <= end; v++) {
+        const g = groups.get(v);
+        if (!g || g.length < 2) { valid = false; break; }
+        cards.push(g[0], g[1]);
+      }
+      if (valid) return cards;
     }
+    return null;
+  }
 
-    // Find smallest possible kickers
-    const vals = [...groups.keys()].sort((a, b) => a - b);
-    for (const v of vals) {
-      const g = groups.get(v)!;
-      if (count === 1) {
-        return [g[0]];
-      } else if (count === 2 && g.length >= 2) {
-        return [g[0], g[1]];
+  private bruteForce(hand: number[], last: PlayResult): number[] | null {
+    // Try all possible combinations (limited to reasonable sizes)
+    const n = hand.length;
+    // For airplane types, try triple combinations
+    if ([PlayType.Airplane, PlayType.AirplaneSingle, PlayType.AirplanePair].includes(last.type)) {
+      // Find bigger triples
+      const groups = this.groupByVal(hand);
+      const triples = [...groups.entries()].filter(([, c]) => c.length >= 3).map(([v]) => v).sort((a, b) => a - b);
+      // Find consecutive sequences
+      for (let i = 0; i < triples.length; i++) {
+        let seq = [triples[i]];
+        for (let j = i + 1; j < triples.length && seq.length < last.chainLength; j++) {
+          if (triples[j] === seq[seq.length - 1] + 1) seq.push(triples[j]);
+          else break;
+        }
+        if (seq.length >= last.chainLength && seq[seq.length - 1] > last.mainValue) {
+          return null; // Complex - skip brute force for now
+        }
       }
     }
     return null;
   }
-}
 
-export function createAI(strategy?: Partial<AIStrategy>): SimpleAI {
-  return new SimpleAI(strategy);
+  private useBomb(hand: number[], last: PlayResult): number[] | null {
+    if (last.type === PlayType.Rocket) return null; // can't beat rocket
+    const groups = this.groupByVal(hand);
+    const vals = [...groups.keys()].sort((a, b) => a - b);
+
+    // If we're close to winning (≤4 cards), use any bomb
+    if (hand.length <= 4 && this.strategy.bombThreshold > 0.3) {
+      const bomb = vals.find(v => groups.get(v)!.length === 4);
+      if (bomb) return groups.get(bomb)!;
+    }
+
+    // Use bomb if threshold met
+    if (Math.random() < this.strategy.bombThreshold) {
+      const bomb = vals.find(v => {
+        if (groups.get(v)!.length < 4) return false;
+        if (last.type === PlayType.Bomb) return v > last.mainValue;
+        return true;
+      });
+      if (bomb) return groups.get(bomb)!;
+    }
+
+    // Use rocket as last resort
+    if (groups.has(16) && groups.has(17) && hand.length <= 5) {
+      return [groups.get(16)![0], groups.get(17)![0]];
+    }
+
+    return null;
+  }
+
+  private groupByVal(hand: number[]): Map<number, number[]> {
+    const m = new Map<number, number[]>();
+    for (const c of hand) {
+      const v = value(c);
+      const g = m.get(v);
+      if (g) g.push(c);
+      else m.set(v, [c]);
+    }
+    return m;
+  }
 }

@@ -92,7 +92,7 @@ export class Client {
       case C2S.CREATE_ROOM: return this.handleCreateRoom();
       case C2S.JOIN_ROOM: return this.handleJoinRoom(payload);
       case C2S.LEAVE_ROOM: return this.handleLeaveRoom();
-      case C2S.ADD_AI: return this.handleAddAI();
+      case C2S.ADD_AI: return this.handleAddAI(payload);
       case C2S.READY: return this.handleReady(payload);
       case C2S.BID: return this.handleBid(payload);
       case 'grab': return this.handleGrab(payload);
@@ -226,12 +226,13 @@ export class Client {
     this.send({ type: 'room_left', payload: {} });
   }
 
-  private handleAddAI() {
+  private handleAddAI(payload: any) {
     const s = this.state!;
     const room = this.hub.getRoomByPlayer(s.playerId);
     if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Not in a room' } });
 
-    const result = this.hub.addAI(room.id);
+    const aiType = (payload?.aiType === 'simple' ? 'simple' : 'deepseek') as 'deepseek' | 'simple';
+    const result = this.hub.addAI(room.id, aiType);
     if (!result.success) {
       return this.send({ type: S2C.ERROR, payload: { code: 400, message: result.error } });
     }

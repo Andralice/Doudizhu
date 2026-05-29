@@ -81,7 +81,7 @@ function logout(){st.token='';localStorage.removeItem('dld_token');st.screen='au
 function doCreateRoom(){st.homeErr='';send('create_room')}
 function doJoinRoom(){if(st.joinId.length===6){st.homeErr='';send('join_room',{roomId:st.joinId})}}
 function doLeaveRoom(){send('leave_room')}
-function doAddAI(){st.roomErr='';send('add_ai');toast('添加AI...','info')}
+function doAddAI(){st.roomErr='';var sel=$('ai-type-sel');var aiType=sel?sel.value:'deepseek';send('add_ai',{aiType:aiType});toast('添加'+(aiType==='simple'?'逻辑':'DeepSeek')+' AI...','info')}
 function doToggleReady(){send('ready',{ready:!st.ready})}
 
 function toggleCard(c){
