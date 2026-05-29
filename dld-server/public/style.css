@@ -90,7 +90,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
 #pz-left{justify-content:flex-start;padding-left:4px}
 #pz-right{justify-content:flex-end;padding-right:4px}
 #pz-mine{justify-content:center}
-.pz-card{display:inline-block;padding:2px 5px;background:var(--card-bg);border-radius:3px;font-size:14px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}.pz-card.red{color:var(--red)}.pz-card.black{color:var(--black)}
+.pz-card{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:34px;height:48px;background:linear-gradient(180deg,#fff,#f5f5f5);border:1.5px solid #ccc;border-radius:4px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,.12)}.pz-card.red{color:var(--red)}.pz-card.black{color:var(--black)}
+.pz-card b{font-size:16px;line-height:1}.pz-card small{font-size:10px;line-height:1}
 .pz-row.mine .pz-card{box-shadow:0 0 6px rgba(91,127,255,.25)}
 .turn-hint{font-size:11px;color:var(--primary);font-weight:600;animation:pulse 1.5s infinite;text-align:center;min-height:15px}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 

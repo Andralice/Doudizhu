@@ -248,13 +248,13 @@ function renderGame(){
     tx('my-count',s.hand.length+'张');
 
     // Fan cards (overlapping)
-    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="tcStart(event,'+c+')" onclick="toggleCard('+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span><span class="st-big '+d.cls+'">'+d.suit+'</span></div>'}).join('');
+    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="tcStart(event,'+c+')" onmousedown="tcStart(event,'+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span></div>'}).join('');
     dp('hand-wrap',s.hand.length>0?'block':'none');
 
     // Played cards
-    hm('pz-left',s.leftPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'">'+d.rank+d.suit+'</span>'}).join(''));
-    hm('pz-right',s.rightPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'">'+d.rank+d.suit+'</span>'}).join(''));
-    hm('pz-mine',s.myPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'">'+d.rank+d.suit+'</span>'}).join(''));
+    hm('pz-left',s.leftPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
+    hm('pz-right',s.rightPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
+    hm('pz-mine',s.myPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
 
     var th=$('turn-hint');if(th){
       if(s.phase==='bidding')th.textContent=s.turn===s.mySeat?'轮到你叫地主':s.turn!==null?'等待叫地主...':'';
@@ -296,18 +296,33 @@ function renderOpp(side,seat){
   var ty=$('ty-'+side);if(ty){var played=side==='left'?st.leftPlayed:st.rightPlayed;if(played.length){ty.style.display='block';ty.innerHTML=played.map(function(c){var d=cd(c);return'<span class="tc '+d.cls+'">'+d.rank+d.suit+'</span>'}).join('')}else ty.style.display='none'}
 }
 
-// ---- Touch swipe ----
-var ts={active:false};
+// ---- Touch/Mouse swipe for card selection ----
+var swipeActive=false,lastToggled=null;
 function tcStart(e,c){
   if(st.phase!=='playing'||st.turn!==st.mySeat)return;
-  e.preventDefault();ts.active=true;toggleCard(c);
+  if(e.type==='touchstart'){e.preventDefault();swipeActive=true;lastToggled=null}
+  toggleCard(c);lastToggled=c;
 }
-document.addEventListener('touchmove',function(e){
-  if(!ts.active)return;
-  var el=document.elementFromPoint(e.touches[0].clientX,e.touches[0].clientY);
-  if(el&&el.classList.contains('card')){var c=parseInt(el.dataset.c);if(!isNaN(c)&&st.sel.indexOf(c)<0)toggleCard(c)}
-},{passive:false});
-document.addEventListener('touchend',function(){ts.active=false});
+function onHandMove(e){
+  if(!swipeActive)return;
+  e.preventDefault();
+  var t=e.touches?e.touches[0]:e,el=document.elementFromPoint(t.clientX,t.clientY);
+  if(!el)return;
+  var card=el.closest('.card');if(!card)return;
+  var c=parseInt(card.dataset.c);
+  if(!isNaN(c)&&c!==lastToggled){toggleCard(c);lastToggled=c}
+}
+function onHandEnd(e){swipeActive=false;lastToggled=null}
+document.addEventListener('DOMContentLoaded',function(){
+  var hw=$('hand-wrap');if(hw){
+    hw.addEventListener('touchmove',onHandMove,{passive:false});
+    hw.addEventListener('touchend',onHandEnd);
+    hw.addEventListener('touchcancel',onHandEnd);
+    hw.addEventListener('mousemove',onHandMove);
+    hw.addEventListener('mouseup',onHandEnd);
+    hw.addEventListener('mouseleave',function(){if(!swipeActive)return;swipeActive=false});
+  }
+});
 
 // ---- Init ----
 st.loginAcc=localStorage.getItem('dld_acc')||'';st.token=localStorage.getItem('dld_token')||'';
