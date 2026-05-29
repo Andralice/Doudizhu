@@ -1,6 +1,7 @@
 :root{--g1:#f9f7ff;--g2:#f5f2ff;--g3:#fdf5fb;--g4:#f4f7ff;--card-bg:rgba(255,255,255,.5);--red:#e53935;--black:#1a1a1a;--primary:#5b7fff;--primary2:#7c5ce7;--danger:#e53935;--secondary:#78909c;--gold:#f5a623;--green:#27ae60;--text:#2c3e50;--text2:#7f8c8d;--text3:#bdc3c7;--radius:14px;--radius-sm:10px;--radius-xs:6px}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(170deg,var(--g1) 0%,var(--g2) 28%,var(--g3) 55%,var(--g4) 82%,var(--g2) 100%);color:var(--text);-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+input,button,select,textarea{font-family:inherit;font-size:inherit}
 #app{width:100%;height:100%;position:relative}
 .full{width:100%;height:100%;position:absolute;top:0;left:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .flex-center{display:flex;align-items:center;justify-content:center;overflow-y:auto}
