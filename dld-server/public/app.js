@@ -239,7 +239,7 @@ function renderGame(){
   try{
     var s=st;
     tx('game-phase',s.phaseText||'');
-    var be=$('bottom-bar');if(be){if(s.bottom.length){be.style.display='block';be.innerHTML='底牌: '+s.bottom.map(function(c){var d=cd(c);return'<span class="mc">'+d.rank+d.suit+'</span>'}).join('')}else be.style.display='none'}
+    var be=$('bottom-bar');if(be){if(s.bottom.length){be.style.display='block';be.innerHTML='底牌: '+s.bottom.map(function(c){var d=cd(c);return'<span class="mc '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join('')}else be.style.display='none'}
 
     renderOpp('left',ls());renderOpp('right',rs());
 
@@ -251,9 +251,9 @@ function renderGame(){
     var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="tcStart(event,'+c+')" onmousedown="tcStart(event,'+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span></div>'}).join('');
     dp('hand-wrap',s.hand.length>0?'block':'none');
 
-    // Played cards
-    hm('pz-left',s.leftPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
-    hm('pz-right',s.rightPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
+    // Played cards - positioned near each player
+    hm('played-left',s.leftPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
+    hm('played-right',s.rightPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
     hm('pz-mine',s.myPlayed.map(function(c){var d=cd(c);return'<span class="pz-card '+d.cls+'"><b>'+d.rank+'</b><small>'+d.suit+'</small></span>'}).join(''));
 
     var th=$('turn-hint');if(th){

@@ -252,7 +252,7 @@ export class DeepSeekPlayer {
       const decision = await this.callDeepSeek(hand, lastPlay, seat, isNewRound);
       const validation = this.validateDecision(hand, lastPlay, isNewRound, decision);
       if (validation.valid) return decision;
-      console.log(`[AI] Invalid decision: ${validation.error}, using fallback`);
+      console.log(`[AI] Invalid: ${validation.error} | AI returned cards=[${decision.cards.join(',')}] | hand=[${hand.slice(0,8).join(',')}...] | lastPlay=${lastPlay?lastPlay.type+' v='+lastPlay.mainValue:'none'}`);
     } catch (err: any) {
       console.log(`[AI] API error: ${err.message}, using fallback`);
     }
