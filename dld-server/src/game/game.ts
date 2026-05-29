@@ -466,10 +466,19 @@ export class GameManager {
 
     const landlordSeat = state.landlordSeat!;
     const isLandlordWin = winnerSeat === landlordSeat;
-    const landlord = this.room.getPlayerBySeat(landlordSeat)!;
-
-    // Calculate score
     let score = state.baseScore * state.multiplier;
+
+    // Record game results for each human player
+    const { recordGame, getStats } = require('../store/accounts');
+    const playerStats: Record<number, any> = {};
+    for (const p of this.room.players) {
+      if (!p || p.isAI) continue;
+      const accId = p.id.startsWith('p_') ? p.id.slice(2) : p.id;
+      const isFarmer = p.seat !== landlordSeat;
+      const won = isLandlordWin ? !isFarmer : isFarmer;
+      recordGame(accId, won);
+      playerStats[p.seat] = getStats(accId);
+    }
 
     prevEvents.push({
       type: 'game_end',
@@ -481,11 +490,7 @@ export class GameManager {
         baseScore: state.baseScore,
         multiplier: state.multiplier,
         finalScore: score,
-        roles: {
-          [landlordSeat]: 'landlord',
-          [(landlordSeat + 1) % 3]: 'farmer',
-          [(landlordSeat + 2) % 3]: 'farmer',
-        },
+        playerStats,
       },
     });
 
