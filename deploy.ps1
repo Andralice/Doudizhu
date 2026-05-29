@@ -7,6 +7,10 @@ $SERVER = "alice@154.8.213.134"
 $REMOTE_DIR = "/opt/dld-server"
 $PORT = 8080
 
+# DeepSeek AI 配置
+$DEEPSEEK_API_KEY = "sk-96def72c5c264af98e3057581f5352dc"
+$DEEPSEEK_MODEL = "deepseek-v4-pro"
+
 function ssh-exec {
     param([string]$cmd)
     $arg = "-i `"$SSH_KEY`" -o StrictHostKeyChecking=no $SERVER `"$cmd`""
@@ -34,6 +38,13 @@ Write-Host "[2/5] 上传文件..." -ForegroundColor Yellow
 # Create remote dir
 ssh-exec "mkdir -p $REMOTE_DIR/dist $REMOTE_DIR/public $REMOTE_DIR/node_modules"
 
+# Write .env file on server
+ssh-exec "cat > $REMOTE_DIR/.env << 'ENVEOF'
+DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
+DEEPSEEK_MODEL=$DEEPSEEK_MODEL
+PORT=$PORT
+ENVEOF"
+
 # Upload dist and public
 scp -r -i $SSH_KEY -o StrictHostKeyChecking=no "dist\*" "${SERVER}:${REMOTE_DIR}/dist/"
 scp -r -i $SSH_KEY -o StrictHostKeyChecking=no "public\*" "${SERVER}:${REMOTE_DIR}/public/"
@@ -49,7 +60,7 @@ Write-Host "已停止" -ForegroundColor Green
 
 # 4. Start server
 Write-Host "[4/5] 启动斗地主服务器..." -ForegroundColor Yellow
-ssh-exec "cd $REMOTE_DIR; screen -dmS dld-server bash -c 'PORT=$PORT node dist/main.js > dld-server.log 2>&1'; sleep 3; screen -list | grep dld-server && echo 'Server OK' || (echo 'Server FAILED'; tail -20 $REMOTE_DIR/dld-server.log)"
+ssh-exec "cd $REMOTE_DIR; screen -dmS dld-server bash -c 'source $REMOTE_DIR/.env; node dist/main.js > dld-server.log 2>&1'; sleep 3; screen -list | grep dld-server && echo 'Server OK' || (echo 'Server FAILED'; tail -20 $REMOTE_DIR/dld-server.log)"
 Write-Host "启动完成" -ForegroundColor Green
 
 # 5. Verify

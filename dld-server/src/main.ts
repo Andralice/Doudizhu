@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Server } from './network/server';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
