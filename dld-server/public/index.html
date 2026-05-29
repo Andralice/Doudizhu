@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>斗地主</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Home Screen -->
+  <div id="screen-home" class="screen active">
+    <div class="home-container">
+      <h1>🃏 斗地主</h1>
+      <div class="form-group">
+        <label>你的昵称</label>
+        <input type="text" id="input-name" placeholder="输入昵称" maxlength="8" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="btn-create">创建房间</button>
+      <div class="divider"><span>或</span></div>
+      <div class="form-group">
+        <label>房间号</label>
+        <input type="text" id="input-room" placeholder="输入6位房间号" maxlength="6" autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+      </div>
+      <button class="btn btn-secondary" id="btn-join">加入房间</button>
+      <div id="home-error" class="error-msg"></div>
+      <div class="info-text">服务器: <span id="server-status">连接中...</span></div>
+    </div>
+  </div>
+
+  <!-- Room Screen -->
+  <div id="screen-room" class="screen">
+    <div class="room-container">
+      <div class="room-header">
+        <button class="btn btn-sm" id="btn-leave">离开</button>
+        <div>房间号: <strong id="room-id-display"></strong></div>
+        <div></div>
+      </div>
+      <div class="player-list" id="player-list"></div>
+      <div id="room-info"></div>
+      <button class="btn btn-primary" id="btn-ready">准备</button>
+      <div id="room-error" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="screen-game" class="screen landscape">
+    <div class="game-board">
+      <!-- Left player -->
+      <div class="player-area player-left" id="player-left">
+        <div class="player-avatar"></div>
+        <div class="player-name" id="name-left"></div>
+        <div class="player-cards-count" id="count-left"></div>
+        <div class="player-role-tag" id="role-left"></div>
+      </div>
+
+      <!-- Center play area -->
+      <div class="center-area">
+        <div class="last-play-row" id="play-left-row"><div class="cards-row" id="cards-left"></div></div>
+        <div class="last-play-row" id="play-top-row"><div class="cards-row" id="cards-top"></div></div>
+        <div class="last-play-row" id="play-mine-row"><div class="cards-row" id="cards-mine-played"></div></div>
+        <div class="turn-indicator" id="turn-indicator"></div>
+      </div>
+
+      <!-- Right player -->
+      <div class="player-area player-right" id="player-right">
+        <div class="player-avatar"></div>
+        <div class="player-name" id="name-right"></div>
+        <div class="player-cards-count" id="count-right"></div>
+        <div class="player-role-tag" id="role-right"></div>
+      </div>
+
+      <!-- My player area (bottom) -->
+      <div class="player-area player-bottom" id="player-bottom">
+        <div class="player-avatar"></div>
+        <div class="player-name" id="name-bottom"></div>
+        <div class="player-cards-count" id="count-bottom"></div>
+        <div class="player-role-tag" id="role-bottom"></div>
+      </div>
+    </div>
+
+    <!-- My hand -->
+    <div class="hand-area">
+      <div class="hand-cards" id="hand-cards"></div>
+      <div class="action-buttons" id="action-buttons">
+        <button class="btn btn-danger" id="btn-play">出牌</button>
+        <button class="btn btn-secondary" id="btn-pass">不出</button>
+        <button class="btn btn-hint" id="btn-hint">提示</button>
+      </div>
+    </div>
+
+    <!-- Bidding / Doubling overlay -->
+    <div class="overlay" id="overlay-bid" style="display:none">
+      <div class="overlay-content">
+        <div id="bid-message"></div>
+        <div class="bid-buttons" id="bid-buttons">
+          <button class="btn btn-secondary bid-btn" data-score="0">不叫</button>
+          <button class="btn btn-primary bid-btn" data-score="1">1分</button>
+          <button class="btn btn-primary bid-btn" data-score="2">2分</button>
+          <button class="btn btn-danger bid-btn" data-score="3">3分</button>
+        </div>
+        <div id="double-buttons" style="display:none">
+          <button class="btn btn-secondary double-btn" data-level="0">不加倍</button>
+          <button class="btn btn-primary double-btn" data-level="1">加倍</button>
+          <button class="btn btn-danger double-btn" data-level="2">超级加倍</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results overlay -->
+    <div class="overlay" id="overlay-result" style="display:none">
+      <div class="overlay-content">
+        <h2 id="result-title"></h2>
+        <div id="result-details"></div>
+        <button class="btn btn-primary" id="btn-continue">继续</button>
+      </div>
+    </div>
+
+    <!-- Bottom cards display -->
+    <div class="bottom-cards-display" id="bottom-cards-display"></div>
+
+    <!-- Phase indicator -->
+    <div class="phase-indicator" id="phase-indicator"></div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
