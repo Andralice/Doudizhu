@@ -134,8 +134,10 @@ export class Client {
     if (token && !payload?.accountId) {
       const stored = loginTokens.get(token);
       if (stored && Date.now() - stored.createdAt < TOKEN_TTL_MS) {
+        const { getStats } = require('../store/accounts');
+        const stats = getStats(stored.accountId);
         this.state = { playerId: `p_${stored.accountId}`, playerName: stored.playerName, accountId: stored.accountId, token, ws: this.ws };
-        return this.send({ type: 'login_ok', payload: { accountId: stored.accountId, playerName: stored.playerName, token } });
+        return this.send({ type: 'login_ok', payload: { accountId: stored.accountId, playerName: stored.playerName, token, stats } });
       }
       return this.send({ type: S2C.ERROR, payload: { code: 401, message: 'Token 已过期，请重新登录' } });
     }
