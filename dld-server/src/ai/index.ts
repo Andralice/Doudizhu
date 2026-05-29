@@ -1,50 +1,25 @@
-export { SimpleAI, createAI } from './simple';
-export type { AIStrategy } from './simple';
-export { DeepSeekAdvisor, getAdvisor } from './deepseek';
+export { SimpleAI } from './simple';
+export { DeepSeekPlayer, AIMemory, getDeepSeekPlayer } from './deepseek';
+export type { AIDecision } from './deepseek';
 
-import { SimpleAI, AIStrategy } from './simple';
-import { DeepSeekAdvisor, getAdvisor } from './deepseek';
+import { DeepSeekPlayer, getDeepSeekPlayer } from './deepseek';
+import { SimpleAI } from './simple';
 
 export interface AIPlayer {
   id: string;
   name: string;
-  ai: SimpleAI;
-  strategy: AIStrategy;
+  seat: number;
+  engine: DeepSeekPlayer;  // primary: DeepSeek with memory
+  fallback: SimpleAI;       // fallback: rule-based
 }
 
-export async function createAIPlayer(
-  playerId: string,
-  name: string,
-  hand?: number[],
-): Promise<AIPlayer> {
-  const advisor = getAdvisor();
-
-  // Use DeepSeek strategy if available, otherwise use default heuristic
-  let strategy: AIStrategy = { aggression: 0.5, bombThreshold: 0.5 };
-
-  if (advisor.isAvailable && hand && hand.length > 0) {
-    strategy = await advisor.getStrategy(hand, {
-      isLandlord: false,
-      handSize: hand.length,
-      opponentLeftSize: 17,
-      opponentRightSize: 17,
-      multiplier: 1,
-      roundNumber: 0,
-      lastPlayType: null,
-      lastPlayValue: null,
-      bombCount: 0,
-    }, playerId);
-  } else {
-    // Default heuristic based on hand size
-    const size = hand?.length ?? 17;
-    if (size <= 3) strategy = { aggression: 0.9, bombThreshold: 0.9 };
-    else if (size <= 6) strategy = { aggression: 0.7, bombThreshold: 0.7 };
-  }
-
+export function createAIPlayer(id: string, name: string, seat: number): AIPlayer {
+  const engine = getDeepSeekPlayer();
   return {
-    id: playerId,
+    id,
     name,
-    ai: new SimpleAI(strategy),
-    strategy,
+    seat,
+    engine,
+    fallback: new SimpleAI({ aggression: 0.6, bombThreshold: 0.6 }),
   };
 }
