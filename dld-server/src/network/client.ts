@@ -175,6 +175,7 @@ export class Client {
       return this.send({ type: S2C.ERROR, payload: { code: 500, message: result.error } });
     }
 
+    // Send directly to the creating player
     this.send({
       type: S2C.ROOM_JOINED,
       payload: {
@@ -183,6 +184,11 @@ export class Client {
         players: this.hub.buildPlayerListPayload(room),
         phase: room.game.phase,
       },
+    });
+    // Also register this socket in the room broadcast set
+    this.broadcastToRoom(room.id, {
+      type: S2C.ROOM_JOINED,
+      payload: { roomId: room.id, seat: result.seat, isSelf: true },
     });
   }
 
@@ -211,6 +217,13 @@ export class Client {
       },
     });
 
+    // Register socket in room broadcast set
+    this.broadcastToRoom(roomId, {
+      type: S2C.ROOM_JOINED,
+      payload: { roomId, seat: result.seat, isSelf: true },
+    });
+
+    // Notify other players
     this.broadcastToRoom(roomId, {
       type: S2C.PLAYER_JOINED,
       payload: {
