@@ -61,13 +61,17 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
 .bottom-bar .mc{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:space-between;width:44px;height:60px;margin:2px;background:linear-gradient(180deg,#fff,#f5f5f5);border:1.5px solid #ccc;border-radius:4px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,.12);vertical-align:middle;padding:3px 0 3px 5px}.mc.red{color:var(--red)}.mc.black{color:var(--black)}.mc b{font-size:17px;line-height:1;font-weight:800}.mc small{font-size:11px;line-height:1}
 
 .game-grid{flex:1;display:grid;grid-template-columns:90px 1fr 90px;gap:2px;padding:2px 4px;min-height:0}
-.ply{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;padding:4px 2px;border-radius:var(--radius-sm);transition:all .3s;opacity:.45;overflow-y:auto}
+.ply{display:flex;flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:2px;padding:2px;border-radius:var(--radius-sm);transition:all .3s;opacity:.45;overflow-y:auto;min-height:0}
+.ply-left{flex-direction:row}.ply-right{flex-direction:row-reverse}
 .ply.active{opacity:1;background:rgba(91,127,255,.06)}
-.ply-av{width:30px;height:30px;border-radius:50%;background:rgba(91,127,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--primary);flex-shrink:0}
-.ply-nm{font-size:10px;font-weight:600;text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ply-rl{font-size:9px;padding:0 4px;border-radius:3px;font-weight:700;display:none}.ply-rl.show{display:block}.ply-rl.lord{background:var(--danger);color:#fff}.ply-rl.farmer{background:var(--green);color:#fff}
-.ply-ct{font-size:10px;color:var(--text2)}
-.ply-played{display:flex;flex-wrap:wrap;gap:0;justify-content:center;align-items:flex-start;margin-top:4px;min-height:30px;overflow-y:auto}
+.ply-info{display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:55px}
+.ply-av{width:28px;height:28px;border-radius:50%;background:rgba(91,127,255,.1);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--primary)}
+.ply-nm{font-size:9px;font-weight:600;text-align:center;max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ply-rl{font-size:8px;padding:0 3px;border-radius:3px;font-weight:700;display:none}.ply-rl.show{display:block}.ply-rl.lord{background:var(--danger);color:#fff}.ply-rl.farmer{background:var(--green);color:#fff}
+.ply-ct{font-size:9px;color:var(--text2)}
+.ply-played{display:flex;flex-wrap:wrap;gap:0;align-items:flex-start;min-height:0;flex:1;overflow-y:auto;justify-content:flex-start}
+.ply-left .ply-played{justify-content:flex-start;padding-left:2px}
+.ply-right .ply-played{justify-content:flex-end;padding-right:2px}
 
 /* Played cards - overlapping, left-aligned like hand */
 .pz-card{display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:space-between;width:46px;height:64px;background:linear-gradient(180deg,#fff,#f5f5f5);border:1.5px solid #ccc;border-radius:4px;font-weight:700;box-shadow:0 2px 4px rgba(0,0,0,.12);margin-right:-18px;flex-shrink:0;padding:3px 0 3px 5px}.pz-card:last-child{margin-right:0}

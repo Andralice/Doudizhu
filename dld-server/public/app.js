@@ -96,28 +96,25 @@ function doGrab(g){send('grab',{grab:g});st.showBid=false;up()}
 function doDouble(l){send('double',{level:l});st.showDouble=false;up()}
 function doContinue(){st.showResult=false;send('ready',{ready:true});st.ready=true;st.screen='room';up()}
 
-// ---- Swipe card selection ----
-var swipeOn=false,lastSwiped=null;
+// ---- Card selection (pointer events for touch+mouse) ----
+var ptrActive=false,ptrLastCard=null;
 function cardDown(e,c){
   if(st.phase!=='playing'||st.turn!==st.mySeat)return;
-  e.preventDefault();swipeOn=true;lastSwiped=null;
-  toggleCard(c);lastSwiped=c;
+  e.preventDefault();ptrActive=true;ptrLastCard=null;
+  toggleCard(c);ptrLastCard=c;
+  // Capture pointer so we keep getting events even outside the card
+  var hw=$('hand-wrap');if(hw&&hw.setPointerCapture)hw.setPointerCapture(e.pointerId||1);
 }
-function handMove(e){
-  if(!swipeOn||!e.touches)return;
+function handPtrMove(e){
+  if(!ptrActive)return;
   e.preventDefault();
-  var x=e.touches[0].clientX;
-  var cards=document.querySelectorAll('#hand-row .card');
-  for(var i=0;i<cards.length;i++){
-    var r=cards[i].getBoundingClientRect();
-    if(x>=r.left-6&&x<=r.right+6){
-      var c=parseInt(cards[i].dataset.c);
-      if(!isNaN(c)&&c!==lastSwiped){toggleCard(c);lastSwiped=c}
-      break;
-    }
-  }
+  var el=document.elementFromPoint(e.clientX,e.clientY);
+  if(!el)return;
+  var card=el.closest('.card');if(!card)return;
+  var c=parseInt(card.dataset.c);
+  if(!isNaN(c)&&c!==ptrLastCard){toggleCard(c);ptrLastCard=c}
 }
-function handUp(){swipeOn=false;lastSwiped=null}
+function handPtrUp(e){ptrActive=false;ptrLastCard=null}
 
 // ---- Render ----
 function $(id){return document.getElementById(id)}
@@ -170,7 +167,7 @@ function renderGame(){
     tx('my-count',s.hand.length+'张');
 
     // Hand - overlapping cards
-    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" ontouchstart="cardDown(event,'+c+')" onmousedown="cardDown(event,'+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span></div>'}).join('');
+    var hr=$('hand-row');if(hr)hr.innerHTML=s.hand.map(function(c){var d=cd(c),sel=s.sel.indexOf(c)>=0?' sel':'';return'<div class="card '+d.cls+sel+'" data-c="'+c+'" onpointerdown="cardDown(event,'+c+')"><span class="rk">'+d.rank+'</span><span class="st">'+d.suit+'</span></div>'}).join('');
     dp('hand-wrap',s.hand.length>0?'block':'none');
 
     // Played cards - overlapping like hand cards
@@ -210,8 +207,8 @@ conn();setInterval(function(){send('ping')},15000);
 document.addEventListener('DOMContentLoaded',function(){
   var la=$('login-acc');if(la){la.value=st.loginAcc;la.addEventListener('input',function(){st.loginAcc=this.value})}
   var ra=$('reg-acc');if(ra)ra.addEventListener('input',function(){st.loginAcc=this.value});
-  // Touch/mouse for hand area
-  var hw=$('hand-wrap');if(hw){hw.addEventListener('touchmove',handMove,{passive:false});hw.addEventListener('touchend',handUp);hw.addEventListener('touchcancel',handUp);hw.addEventListener('mousemove',handMove);hw.addEventListener('mouseup',handUp)}
+  // Pointer events for hand swipe
+  var hw=$('hand-wrap');if(hw){hw.addEventListener('pointermove',handPtrMove);hw.addEventListener('pointerup',handPtrUp);hw.addEventListener('pointercancel',handPtrUp);hw.style.touchAction='none'}
   up();setInterval(up,400);
 });
 
