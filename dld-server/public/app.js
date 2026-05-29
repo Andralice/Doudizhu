@@ -219,7 +219,7 @@ function up(){
     tx('room-id',s.roomId);
     for(var i=0;i<3;i++){renderSeat(i)}
     var rse=$('room-status');if(rse){var c=pc(),r=prc();rse.textContent=c<3?'等待加入 ('+c+'/3) — 点"+AI"添加机器人':r<3?'已准备: '+r+'/3':'全部就绪，游戏开始！'}
-    var rb=$('ready-btn');if(rb){rb.textContent=s.ready?'取消准备':'准备';rb.className='btn full big '+(s.ready?'secondary':'primary')}
+    var rb=$('ready-btn');if(rb){rb.textContent=s.ready?'取消准备':'准备';rb.className='btn room-ready-btn '+(s.ready?'secondary':'primary')}
     var ab=$('add-ai-btn');if(ab)ab.disabled=pc()>=3||!s.roomId;
     tx('room-err',s.roomErr);
   }
