@@ -97,29 +97,27 @@ function doDouble(l){send('double',{level:l});st.showDouble=false;up()}
 function doContinue(){st.showResult=false;send('ready',{ready:true});st.ready=true;st.screen='room';up()}
 
 // ---- Swipe card selection ----
-var swipeOn=false,swipeCards=[],swipeStartX=0;
+var swipeOn=false,lastSwiped=null;
 function cardDown(e,c){
   if(st.phase!=='playing'||st.turn!==st.mySeat)return;
-  if(e.type==='touchstart'){e.preventDefault();swipeOn=true;swipeStartX=e.touches[0].clientX}
-  else{swipeOn=true;swipeStartX=e.clientX}
-  // Get all card elements for position calculation
-  swipeCards=Array.from(document.querySelectorAll('#hand-row .card'));
-  toggleCard(c);
+  e.preventDefault();swipeOn=true;lastSwiped=null;
+  toggleCard(c);lastSwiped=c;
 }
 function handMove(e){
-  if(!swipeOn)return;
-  var x=e.touches?e.touches[0].clientX:e.clientX;
-  // Find card under finger by checking bounding rects
-  for(var i=0;i<swipeCards.length;i++){
-    var r=swipeCards[i].getBoundingClientRect();
-    if(x>=r.left-4&&x<=r.right+4){
-      var c=parseInt(swipeCards[i].dataset.c);
-      if(!isNaN(c)&&st.sel.indexOf(c)<0)toggleCard(c);
+  if(!swipeOn||!e.touches)return;
+  e.preventDefault();
+  var x=e.touches[0].clientX;
+  var cards=document.querySelectorAll('#hand-row .card');
+  for(var i=0;i<cards.length;i++){
+    var r=cards[i].getBoundingClientRect();
+    if(x>=r.left-6&&x<=r.right+6){
+      var c=parseInt(cards[i].dataset.c);
+      if(!isNaN(c)&&c!==lastSwiped){toggleCard(c);lastSwiped=c}
       break;
     }
   }
 }
-function handUp(){swipeOn=false;swipeCards=[]}
+function handUp(){swipeOn=false;lastSwiped=null}
 
 // ---- Render ----
 function $(id){return document.getElementById(id)}
