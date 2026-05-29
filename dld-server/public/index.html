@@ -7,235 +7,169 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>斗地主</title>
 <link rel="stylesheet" href="style.css">
-<script src="vue.global.prod.js"></script>
 </head>
 <body>
 <div id="app">
   <!-- Toast -->
-  <transition name="fade">
-    <div v-if="toast.show" class="toast" :class="toast.type">{{ toast.message }}</div>
-  </transition>
+  <div class="toast"></div>
 
-  <!-- Login Screen -->
-  <div v-if="screen === 'login'" class="screen-login">
+  <!-- ===== Login Screen ===== -->
+  <div id="screen-login" class="screen-login" style="display:flex">
     <div class="login-card">
       <div class="login-logo">🃏</div>
       <h1>斗地主</h1>
       <p class="login-subtitle">输入账号和昵称开始游戏</p>
       <div class="form-group">
         <label>账号</label>
-        <input v-model="loginAccount" placeholder="输入账号（如手机号或英文名）" maxlength="20" @keyup.enter="doLogin">
+        <input id="input-login-account" placeholder="输入账号（如手机号或英文名）" maxlength="20" onkeyup="if(event.key==='Enter')window.doLogin()">
       </div>
       <div class="form-group">
         <label>昵称</label>
-        <input v-model="loginName" placeholder="游戏内显示的名称" maxlength="8" @keyup.enter="doLogin">
+        <input id="input-login-name" placeholder="游戏内显示名称" maxlength="8" onkeyup="if(event.key==='Enter')window.doLogin()">
       </div>
-      <button class="btn btn-primary btn-lg" @click="doLogin" :disabled="!loginAccount || !loginName || loggingIn">
-        {{ loggingIn ? '登录中...' : '进入游戏' }}
-      </button>
-      <p v-if="loginError" class="error-text">{{ loginError }}</p>
-      <p v-if="autoLogging" class="info-text">自动登录中...</p>
+      <button class="btn btn-primary btn-lg" onclick="window.doLogin()">进入游戏</button>
+      <p id="login-error" class="error-text"></p>
+      <p id="login-auto" class="info-text" style="display:none">自动登录中...</p>
     </div>
   </div>
 
-  <!-- Home Screen -->
-  <div v-if="screen === 'home'" class="screen-home">
+  <!-- ===== Home Screen ===== -->
+  <div id="screen-home" class="screen-home" style="display:none">
     <div class="home-container">
       <div class="home-header">
         <div>
           <h1>🃏 斗地主</h1>
-          <p class="user-info">{{ playerName }} · {{ accountId }}</p>
+          <p class="user-info"><span id="home-player-name"></span> · <span id="home-account-id"></span></p>
         </div>
-        <button class="btn btn-sm btn-outline" @click="logout">退出</button>
+        <button class="btn btn-sm btn-outline" onclick="window.logout()">退出</button>
       </div>
-
       <div class="card-panel">
         <h3>创建房间</h3>
-        <button class="btn btn-primary btn-lg" @click="createRoom">创建新房间</button>
+        <button class="btn btn-primary btn-lg" onclick="window.doCreateRoom()">创建新房间</button>
       </div>
-
       <div class="card-panel">
         <h3>加入房间</h3>
         <div class="join-row">
-          <input v-model="joinRoomId" placeholder="输入6位房间号" maxlength="6" inputmode="numeric" @keyup.enter="joinRoom">
-          <button class="btn btn-secondary" @click="joinRoom" :disabled="joinRoomId.length !== 6">加入</button>
+          <input id="input-join-room" placeholder="输入6位房间号" maxlength="6" inputmode="numeric" onkeyup="if(event.key==='Enter')window.doJoinRoom()">
+          <button class="btn btn-secondary" onclick="window.doJoinRoom()">加入</button>
         </div>
       </div>
-
-      <div v-if="history.length > 0" class="card-panel">
+      <div class="card-panel" id="history-panel">
         <h3>历史战绩</h3>
-        <div class="history-list">
-          <div v-for="(h, i) in history.slice(0, 10)" :key="i" class="history-item">
-            <span class="history-date">{{ h.date }}</span>
-            <span class="history-result" :class="h.won ? 'win' : 'lose'">{{ h.won ? '胜' : '负' }}</span>
-            <span class="history-detail">{{ h.detail }}</span>
-          </div>
-        </div>
+        <div class="history-list" id="history-list"></div>
       </div>
-
-      <p v-if="homeError" class="error-text">{{ homeError }}</p>
+      <p id="home-error" class="error-text"></p>
     </div>
   </div>
 
-  <!-- Room Screen -->
-  <div v-if="screen === 'room'" class="screen-room">
+  <!-- ===== Room Screen ===== -->
+  <div id="screen-room" class="screen-room" style="display:none">
     <div class="room-container">
       <div class="room-header-bar">
-        <button class="btn btn-sm btn-outline" @click="leaveRoom">离开</button>
-        <div class="room-id-badge">房间 <strong>{{ roomId }}</strong></div>
-        <button class="btn btn-sm btn-ai" @click="addAI" :disabled="roomPlayers.filter(p => p).length >= 3">
-          + AI玩家
-        </button>
+        <button class="btn btn-sm btn-outline" onclick="window.doLeaveRoom()">离开</button>
+        <div class="room-id-badge">房间 <strong id="room-id-display"></strong></div>
+        <button id="btn-add-ai" class="btn btn-sm btn-ai" onclick="window.doAddAI()">+ AI玩家</button>
       </div>
-
       <div class="player-grid">
-        <div v-for="i in 3" :key="i" class="player-slot" :class="{ empty: !roomPlayers[i-1], ai: roomPlayers[i-1]?.isAI }">
-          <template v-if="roomPlayers[i-1]">
-            <div class="player-avatar">{{ roomPlayers[i-1].isAI ? '🤖' : roomPlayers[i-1].name[0] }}</div>
-            <div class="player-info">
-              <div class="player-name">{{ roomPlayers[i-1].name }} {{ roomPlayers[i-1].isAI ? '(AI)' : roomPlayers[i-1].name === playerName ? '(你)' : '' }}</div>
-              <div class="player-status">
-                <span v-if="roomPlayers[i-1].ready" class="badge badge-ready">已准备</span>
-                <span v-else class="badge badge-wait">未准备</span>
-              </div>
-            </div>
-          </template>
-          <template v-else>
-            <div class="player-avatar empty-slot">?</div>
-            <div class="player-info"><div class="player-name">空位</div></div>
-          </template>
-        </div>
+        <div id="room-slot-0" class="player-slot"></div>
+        <div id="room-slot-1" class="player-slot"></div>
+        <div id="room-slot-2" class="player-slot"></div>
       </div>
-
       <div class="room-actions">
-        <p class="room-status">{{ roomStatus }}</p>
-        <button class="btn btn-primary btn-lg" @click="playerReady">
-          {{ readyState ? '取消准备' : '准备' }}
-        </button>
+        <p class="room-status" id="room-status"></p>
+        <button id="btn-ready" class="btn btn-lg btn-primary" onclick="window.doToggleReady()">准备</button>
       </div>
-
-      <p v-if="roomError" class="error-text">{{ roomError }}</p>
+      <p id="room-error" class="error-text"></p>
     </div>
   </div>
 
-  <!-- Game Screen -->
-  <div v-if="screen === 'game'" class="screen-game">
-    <!-- Phase indicator -->
-    <div class="game-phase-bar">{{ phaseText }}</div>
-
-    <!-- Bottom cards display -->
-    <div v-if="bottomCards.length" class="bottom-cards-bar">
-      底牌: <span v-for="c in bottomCards" :key="c" class="mini-card">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-    </div>
+  <!-- ===== Game Screen ===== -->
+  <div id="screen-game" class="screen-game" style="display:none">
+    <div class="game-phase-bar" id="phase-bar"></div>
+    <div class="bottom-cards-bar" id="bottom-cards-bar" style="display:none"></div>
 
     <div class="game-layout">
       <!-- Left opponent -->
-      <div class="opponent-area left" :class="{ active: currentTurn === leftSeat }">
-        <div class="opp-avatar">{{ getPlayerName(leftSeat) ? getPlayerName(leftSeat)[0] : '?' }}</div>
-        <div class="opp-name">{{ getPlayerName(leftSeat) || '等待' }}</div>
-        <div class="opp-role" v-if="landlordSeat !== null" :class="landlordSeat === leftSeat ? 'landlord' : 'farmer'">
-          {{ landlordSeat === leftSeat ? '地主' : '农民' }}
-        </div>
-        <div class="opp-count">{{ getPlayerHandCount(leftSeat) }}张</div>
-        <div v-if="leftPlayed.length" class="opp-played">
-          <span v-for="c in leftPlayed" :key="c" class="tiny-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-        </div>
+      <div class="opponent-area left">
+        <div class="opp-avatar">?</div>
+        <div class="opp-name" id="name-left">等待</div>
+        <div class="opp-role" id="role-left" style="display:none"></div>
+        <div class="opp-count" id="count-left">0张</div>
+        <div class="opp-played" id="tiny-left" style="display:none"></div>
       </div>
 
-      <!-- Center play area -->
+      <!-- Center -->
       <div class="center-play-area">
-        <div class="played-row" v-if="leftPlayed.length">
-          <span v-for="c in leftPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-        </div>
-        <div class="played-row" v-if="rightPlayed.length">
-          <span v-for="c in rightPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-        </div>
-        <div class="played-row my-played" v-if="myPlayed.length">
-          <span v-for="c in myPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-        </div>
-        <div class="turn-hint" v-if="currentTurn !== null">
-          {{ currentTurn === mySeat ? '轮到你出牌' : '等待 ' + getPlayerName(currentTurn) + ' 出牌...' }}
-        </div>
+        <div class="played-row" id="played-left-cards"></div>
+        <div class="played-row" id="played-right-cards"></div>
+        <div class="played-row my-played" id="played-mine-cards"></div>
+        <div class="turn-hint" id="turn-indicator"></div>
       </div>
 
       <!-- Right opponent -->
-      <div class="opponent-area right" :class="{ active: currentTurn === rightSeat }">
-        <div class="opp-avatar">{{ getPlayerName(rightSeat) ? getPlayerName(rightSeat)[0] : '?' }}</div>
-        <div class="opp-name">{{ getPlayerName(rightSeat) || '等待' }}</div>
-        <div class="opp-role" v-if="landlordSeat !== null" :class="landlordSeat === rightSeat ? 'landlord' : 'farmer'">
-          {{ landlordSeat === rightSeat ? '地主' : '农民' }}
-        </div>
-        <div class="opp-count">{{ getPlayerHandCount(rightSeat) }}张</div>
-        <div v-if="rightPlayed.length" class="opp-played">
-          <span v-for="c in rightPlayed" :key="c" class="tiny-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
-        </div>
+      <div class="opponent-area right">
+        <div class="opp-avatar">?</div>
+        <div class="opp-name" id="name-right">等待</div>
+        <div class="opp-role" id="role-right" style="display:none"></div>
+        <div class="opp-count" id="count-right">0张</div>
+        <div class="opp-played" id="tiny-right" style="display:none"></div>
       </div>
     </div>
 
     <!-- My info bar -->
     <div class="my-info-bar">
-      <span>{{ playerName }} (你)</span>
-      <span v-if="landlordSeat !== null" class="my-role" :class="landlordSeat === mySeat ? 'landlord' : 'farmer'">
-        {{ landlordSeat === mySeat ? '地主' : '农民' }}
-      </span>
-      <span>{{ myHand.length }}张</span>
+      <span id="my-info-name"></span>
+      <span id="my-info-role" class="my-role" style="display:none"></span>
+      <span id="my-info-count">0张</span>
     </div>
 
-    <!-- Hand cards -->
-    <div class="hand-area" v-if="myHand.length > 0">
-      <div class="hand-cards-row">
-        <div v-for="c in myHand" :key="c" class="card-el" :class="[cd(c).cls, { selected: selectedCards.has(c) }]"
-             @click="toggleCard(c)">
-          <span class="card-rank">{{ cd(c).rank }}</span>
-          <span class="card-suit">{{ cd(c).suit }}</span>
-        </div>
-      </div>
+    <!-- Hand -->
+    <div class="hand-area" id="hand-area">
+      <div class="hand-cards-row" id="hand-cards-row"></div>
     </div>
 
     <!-- Action buttons -->
     <div class="action-bar">
-      <button class="btn btn-play" @click="doPlay" :disabled="!canPlay">出牌</button>
-      <button class="btn btn-pass" @click="doPass" :disabled="!canPass">不出</button>
-      <button class="btn btn-hint" @click="doHint" :disabled="currentTurn !== mySeat">提示</button>
+      <button class="btn btn-play" id="btn-play" onclick="window.doPlay()" disabled>出牌</button>
+      <button class="btn btn-pass" id="btn-pass" onclick="window.doPass()" disabled>不出</button>
+      <button class="btn btn-hint" id="btn-hint" onclick="window.doHint()" disabled>提示</button>
     </div>
 
     <!-- Bidding overlay -->
-    <div v-if="showBidOverlay" class="overlay">
+    <div class="overlay" id="overlay-bid" style="display:none">
       <div class="overlay-box">
-        <p>{{ bidMessage }}</p>
+        <p id="bid-message"></p>
         <div class="bid-btns">
-          <button v-for="s in [0,1,2,3]" :key="s" class="btn" :class="s === 0 ? 'btn-secondary' : 'btn-primary'"
-                  @click="doBid(s)" :disabled="s > 0 && s <= bidCurrentScore">
-            {{ s === 0 ? '不叫' : s + '分' }}
-          </button>
+          <button class="btn btn-secondary bid-btn" data-score="0" onclick="window.doBid(0)">不叫</button>
+          <button class="btn btn-primary bid-btn" data-score="1" onclick="window.doBid(1)">1分</button>
+          <button class="btn btn-primary bid-btn" data-score="2" onclick="window.doBid(2)">2分</button>
+          <button class="btn btn-danger bid-btn" data-score="3" onclick="window.doBid(3)">3分</button>
         </div>
       </div>
     </div>
 
     <!-- Doubling overlay -->
-    <div v-if="showDoubleOverlay" class="overlay">
+    <div class="overlay" id="overlay-double" style="display:none">
       <div class="overlay-box">
         <p>选择加倍</p>
         <div class="bid-btns">
-          <button v-for="l in [0,1,2]" :key="l" class="btn" :class="l === 0 ? 'btn-secondary' : 'btn-primary'"
-                  @click="doDouble(l)">
-            {{ l === 0 ? '不加倍' : l === 1 ? '加倍' : '超级加倍' }}
-          </button>
+          <button class="btn btn-secondary" onclick="window.doDouble(0)">不加倍</button>
+          <button class="btn btn-primary" onclick="window.doDouble(1)">加倍</button>
+          <button class="btn btn-danger" onclick="window.doDouble(2)">超级加倍</button>
         </div>
       </div>
     </div>
 
     <!-- Result overlay -->
-    <div v-if="showResult" class="overlay">
+    <div class="overlay" id="overlay-result" style="display:none">
       <div class="overlay-box">
-        <h2>{{ resultTitle }}</h2>
-        <p>{{ resultDetail }}</p>
-        <button class="btn btn-primary btn-lg" @click="continueGame">继续</button>
+        <h2 id="result-title"></h2>
+        <p id="result-details"></p>
+        <button class="btn btn-primary btn-lg" onclick="window.doContinue()">继续</button>
       </div>
     </div>
   </div>
 </div>
-
 <script src="app.js"></script>
 </body>
 </html>
