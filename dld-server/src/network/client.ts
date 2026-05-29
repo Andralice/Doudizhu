@@ -83,6 +83,7 @@ export class Client {
     if (!type) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Missing type' } });
 
     if (type === 'login') return this.handleLogin(payload);
+    if (type === 'register') return this.handleRegister(payload);
 
     const auth = this.requireAuth();
     if (!auth) return;
@@ -105,31 +106,55 @@ export class Client {
     }
   }
 
-  // ---- Login ----
+  // ---- Auth ----
+
+  private handleRegister(payload: any) {
+    const accountId = payload?.accountId?.trim();
+    const nickname = payload?.nickname?.trim();
+    if (!accountId || !nickname) {
+      return this.send({ type: S2C.ERROR, payload: { code: 400, message: '请填写账号和昵称' } });
+    }
+    // Import and call store
+    const { register } = require('../store/accounts');
+    const result = register(accountId, nickname);
+    if (!result.success) {
+      return this.send({ type: S2C.ERROR, payload: { code: 400, message: result.error } });
+    }
+    // Auto-login after register
+    const newToken = 'tok_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    loginTokens.set(newToken, { accountId, playerName: nickname, createdAt: Date.now() });
+    this.state = { playerId: `p_${accountId}`, playerName: nickname, accountId, token: newToken, ws: this.ws };
+    this.send({ type: 'login_ok', payload: { accountId, playerName: nickname, token: newToken, stats: { gamesPlayed: 0, gamesWon: 0, winRate: '0%' } } });
+  }
 
   private handleLogin(payload: any) {
-    const accountId = payload?.accountId?.trim();
-    const playerName = payload?.playerName?.trim();
     const token = payload?.token;
-
-    if (token && !accountId) {
+    // Token-based re-login
+    if (token && !payload?.accountId) {
       const stored = loginTokens.get(token);
       if (stored && Date.now() - stored.createdAt < TOKEN_TTL_MS) {
         this.state = { playerId: `p_${stored.accountId}`, playerName: stored.playerName, accountId: stored.accountId, token, ws: this.ws };
         return this.send({ type: 'login_ok', payload: { accountId: stored.accountId, playerName: stored.playerName, token } });
       }
-      return this.send({ type: S2C.ERROR, payload: { code: 401, message: 'Token expired, please re-login' } });
+      return this.send({ type: S2C.ERROR, payload: { code: 401, message: 'Token 已过期，请重新登录' } });
     }
 
-    if (!accountId || !playerName) {
-      return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Account and name required' } });
+    const accountId = payload?.accountId?.trim();
+    if (!accountId) {
+      return this.send({ type: S2C.ERROR, payload: { code: 400, message: '请输入账号' } });
     }
-
+    // Check against store
+    const { login, getStats } = require('../store/accounts');
+    const result = login(accountId);
+    if (!result.success) {
+      return this.send({ type: S2C.ERROR, payload: { code: 400, message: result.error } });
+    }
+    const acc = result.account!;
     const newToken = 'tok_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
-    loginTokens.set(newToken, { accountId, playerName, createdAt: Date.now() });
-
-    this.state = { playerId: `p_${accountId}`, playerName, accountId, token: newToken, ws: this.ws };
-    this.send({ type: 'login_ok', payload: { accountId, playerName, token: newToken } });
+    loginTokens.set(newToken, { accountId, playerName: acc.nickname, createdAt: Date.now() });
+    const stats = getStats(accountId);
+    this.state = { playerId: `p_${accountId}`, playerName: acc.nickname, accountId, token: newToken, ws: this.ws };
+    this.send({ type: 'login_ok', payload: { accountId, playerName: acc.nickname, token: newToken, stats } });
   }
 
   private requireAuth(): ClientState | null {
