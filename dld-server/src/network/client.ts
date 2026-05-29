@@ -15,9 +15,8 @@ interface ClientState {
 
 const PING_INTERVAL_MS = 15000;
 
-// Simple in-memory login token store
 const loginTokens: Map<string, { accountId: string; playerName: string; createdAt: number }> = new Map();
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class Client {
   hub: Hub;
@@ -25,6 +24,8 @@ export class Client {
   private state: ClientState | null = null;
   private pongReceived = true;
   private pingTimer: NodeJS.Timeout | null = null;
+  private _registerCallback: ((roomId: string, playerId: string) => void) | null = null;
+  private _unregisterCallback: ((roomId: string) => void) | null = null;
 
   constructor(hub: Hub, ws: WebSocket) {
     this.hub = hub;
@@ -36,17 +37,16 @@ export class Client {
         const msg = JSON.parse(raw.toString());
         this.handleMessage(msg);
       } catch {
-        this.send({ type: S2C.ERROR, payload: { code: 400, message: '无效的消息格式' } });
+        this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Invalid JSON' } });
       }
     });
 
-    ws.on('close', () => {
-      this.stopHeartbeat();
-      this.handleDisconnect();
-    });
-
+    ws.on('close', () => { this.stopHeartbeat(); this.handleDisconnect(); });
     ws.on('pong', () => { this.pongReceived = true; });
   }
+
+  onRegisterInRoom(cb: (roomId: string, playerId: string) => void) { this._registerCallback = cb; }
+  onUnregisterFromRoom(cb: (roomId: string) => void) { this._unregisterCallback = cb; }
 
   private startHeartbeat(ws: WebSocket) {
     this.pingTimer = setInterval(() => {
@@ -56,9 +56,7 @@ export class Client {
     }, PING_INTERVAL_MS);
   }
 
-  private stopHeartbeat() {
-    if (this.pingTimer) clearInterval(this.pingTimer);
-  }
+  private stopHeartbeat() { if (this.pingTimer) clearInterval(this.pingTimer); }
 
   private send(msg: { type: string; payload: any }) {
     if (this.ws.readyState === WebSocket.OPEN) {
@@ -67,41 +65,43 @@ export class Client {
   }
 
   private broadcastToRoom(roomId: string, msg: { type: string; payload: any }) {
-    if (this.hub.broadcast) {
-      this.hub.broadcast(roomId, msg, this.ws);
-    }
+    if (this.hub.broadcast) this.hub.broadcast(roomId, msg);
   }
 
-  // ---- Message Handler ----
+  private registerInRoom(roomId: string, playerId: string) {
+    if (this._registerCallback) this._registerCallback(roomId, playerId);
+  }
+
+  private unregisterFromRoom(roomId: string) {
+    if (this._unregisterCallback) this._unregisterCallback(roomId);
+  }
+
+  // ---- Message Router ----
 
   private handleMessage(msg: any) {
     const { type, payload } = msg;
-    if (!type) {
-      return this.send({ type: S2C.ERROR, payload: { code: 400, message: '缺少 type 字段' } });
-    }
+    if (!type) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Missing type' } });
 
-    // Login doesn't require auth
     if (type === 'login') return this.handleLogin(payload);
 
-    // All other messages require auth
     const auth = this.requireAuth();
     if (!auth) return;
 
     switch (type) {
-      case C2S.CREATE_ROOM: return this.handleCreateRoom(payload);
+      case C2S.CREATE_ROOM: return this.handleCreateRoom();
       case C2S.JOIN_ROOM: return this.handleJoinRoom(payload);
-      case C2S.LEAVE_ROOM: return this.handleLeaveRoom(payload);
-      case C2S.ADD_AI: return this.handleAddAI(payload);
+      case C2S.LEAVE_ROOM: return this.handleLeaveRoom();
+      case C2S.ADD_AI: return this.handleAddAI();
       case C2S.READY: return this.handleReady(payload);
       case C2S.BID: return this.handleBid(payload);
       case C2S.DOUBLE: return this.handleDouble(payload);
       case C2S.PLAY: return this.handlePlay(payload);
-      case C2S.PASS: return this.handlePass(payload);
-      case C2S.HINT: return this.handleHint(payload);
+      case C2S.PASS: return this.handlePass();
+      case C2S.HINT: return this.handleHint();
       case C2S.PING: return this.send({ type: S2C.PONG, payload: {} });
       case C2S.RECONNECT: return this.handleReconnect(payload);
       default:
-        return this.send({ type: S2C.ERROR, payload: { code: 400, message: `未知的消息类型: ${type}` } });
+        return this.send({ type: S2C.ERROR, payload: { code: 400, message: `Unknown type: ${type}` } });
     }
   }
 
@@ -112,45 +112,24 @@ export class Client {
     const playerName = payload?.playerName?.trim();
     const token = payload?.token;
 
-    // Token-based re-login
     if (token && !accountId) {
       const stored = loginTokens.get(token);
       if (stored && Date.now() - stored.createdAt < TOKEN_TTL_MS) {
-        this.state = {
-          playerId: `p_${stored.accountId}`,
-          playerName: stored.playerName,
-          accountId: stored.accountId,
-          token,
-          ws: this.ws,
-        };
-        return this.send({
-          type: 'login_ok',
-          payload: { accountId: stored.accountId, playerName: stored.playerName, token },
-        });
+        this.state = { playerId: `p_${stored.accountId}`, playerName: stored.playerName, accountId: stored.accountId, token, ws: this.ws };
+        return this.send({ type: 'login_ok', payload: { accountId: stored.accountId, playerName: stored.playerName, token } });
       }
-      return this.send({ type: S2C.ERROR, payload: { code: 401, message: 'Token 已过期，请重新登录' } });
+      return this.send({ type: S2C.ERROR, payload: { code: 401, message: 'Token expired, please re-login' } });
     }
 
     if (!accountId || !playerName) {
-      return this.send({ type: S2C.ERROR, payload: { code: 400, message: '请输入账号和昵称' } });
+      return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Account and name required' } });
     }
 
-    // Simple login: accountId + playerName, no password
     const newToken = 'tok_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     loginTokens.set(newToken, { accountId, playerName, createdAt: Date.now() });
 
-    this.state = {
-      playerId: `p_${accountId}`,
-      playerName,
-      accountId,
-      token: newToken,
-      ws: this.ws,
-    };
-
-    this.send({
-      type: 'login_ok',
-      payload: { accountId, playerName, token: newToken },
-    });
+    this.state = { playerId: `p_${accountId}`, playerName, accountId, token: newToken, ws: this.ws };
+    this.send({ type: 'login_ok', payload: { accountId, playerName, token: newToken } });
   }
 
   private requireAuth(): ClientState | null {
@@ -163,83 +142,54 @@ export class Client {
 
   // ---- Room Handlers ----
 
-  private handleCreateRoom(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-
-    this.hub.leaveRoom(auth.playerId);
+  private handleCreateRoom() {
+    const s = this.state!;
+    this.hub.leaveRoom(s.playerId);
 
     const room = this.hub.createRoom();
-    const result = this.hub.joinRoom(room.id, auth.playerId, auth.playerName);
+    const result = this.hub.joinRoom(room.id, s.playerId, s.playerName);
     if (!result.success) {
       return this.send({ type: S2C.ERROR, payload: { code: 500, message: result.error } });
     }
 
-    // Send directly to the creating player
+    this.registerInRoom(room.id, s.playerId);
+
     this.send({
       type: S2C.ROOM_JOINED,
-      payload: {
-        roomId: room.id,
-        seat: result.seat,
-        players: this.hub.buildPlayerListPayload(room),
-        phase: room.game.phase,
-      },
-    });
-    // Also register this socket in the room broadcast set
-    this.broadcastToRoom(room.id, {
-      type: S2C.ROOM_JOINED,
-      payload: { roomId: room.id, seat: result.seat, isSelf: true },
+      payload: { roomId: room.id, seat: result.seat, players: this.hub.buildPlayerListPayload(room), phase: room.game.phase },
     });
   }
 
   private handleJoinRoom(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-
+    const s = this.state!;
     const roomId = payload?.roomId;
-    if (!roomId) {
-      return this.send({ type: S2C.ERROR, payload: { code: 400, message: '请提供房间号' } });
-    }
+    if (!roomId) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '请提供房间号' } });
 
-    const result = this.hub.joinRoom(roomId, auth.playerId, auth.playerName);
+    const result = this.hub.joinRoom(roomId, s.playerId, s.playerName);
     if (!result.success) {
       return this.send({ type: S2C.ERROR, payload: { code: 400, message: result.error } });
     }
 
     const room = result.room!;
+    this.registerInRoom(roomId, s.playerId);
+
     this.send({
       type: S2C.ROOM_JOINED,
-      payload: {
-        roomId,
-        seat: result.seat,
-        players: this.hub.buildPlayerListPayload(room),
-        phase: room.game.phase,
-      },
+      payload: { roomId, seat: result.seat, players: this.hub.buildPlayerListPayload(room), phase: room.game.phase },
     });
 
-    // Register socket in room broadcast set
-    this.broadcastToRoom(roomId, {
-      type: S2C.ROOM_JOINED,
-      payload: { roomId, seat: result.seat, isSelf: true },
-    });
-
-    // Notify other players
     this.broadcastToRoom(roomId, {
       type: S2C.PLAYER_JOINED,
-      payload: {
-        seat: result.seat,
-        playerName: auth.playerName,
-        isAI: false,
-        players: this.hub.buildPlayerListPayload(room),
-      },
+      payload: { seat: result.seat, playerName: s.playerName, isAI: false, players: this.hub.buildPlayerListPayload(room) },
     });
   }
 
-  private handleLeaveRoom(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
+  private handleLeaveRoom() {
+    const s = this.state!;
+    const room = this.hub.getRoomByPlayer(s.playerId);
+    if (room) this.unregisterFromRoom(room.id);
 
-    const result = this.hub.leaveRoom(auth.playerId);
+    const result = this.hub.leaveRoom(s.playerId);
     if (result.room) {
       this.broadcastToRoom(result.room.id, {
         type: S2C.PLAYER_LEFT,
@@ -247,151 +197,142 @@ export class Client {
       });
     }
 
-    // Send explicit left message so client knows to go back to home
     this.send({ type: 'room_left', payload: {} });
   }
 
-  private handleAddAI(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-
-    const room = this.hub.getRoomByPlayer(auth.playerId);
-    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '你不在任何房间中' } });
+  private handleAddAI() {
+    const s = this.state!;
+    const room = this.hub.getRoomByPlayer(s.playerId);
+    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Not in a room' } });
 
     const result = this.hub.addAI(room.id);
     if (!result.success) {
       return this.send({ type: S2C.ERROR, payload: { code: 400, message: result.error } });
     }
-    // addAI already broadcasts player_joined + triggers game start if full
+    // AI added — player_joined is broadcast by hub.addAI
+    // If room is now full, hub.addAI triggers game start
   }
 
   private handleReady(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
+    const s = this.state!;
+    const room = this.hub.getRoomByPlayer(s.playerId);
+    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Not in a room' } });
 
-    const room = this.hub.getRoomByPlayer(auth.playerId);
-    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '你不在任何房间中' } });
+    const player = room.getPlayer(s.playerId);
+    if (!player) return;
 
-    room.setPlayerReady(auth.playerId, true);
+    // Toggle ready state
+    const newReady = payload?.ready ?? !player.ready;
+    room.setPlayerReady(s.playerId, newReady);
 
+    // Send updated state just to this player
+    this.send({
+      type: 'ready_state',
+      payload: { ready: newReady, players: this.hub.buildPlayerListPayload(room) },
+    });
+
+    // Broadcast to others
     this.broadcastToRoom(room.id, {
       type: S2C.PLAYER_READY,
-      payload: { seat: room.getPlayer(auth.playerId)!.seat, playerName: auth.playerName },
+      payload: { seat: player.seat, playerName: s.playerName, ready: newReady, players: this.hub.buildPlayerListPayload(room) },
     });
   }
 
-  // ---- Game Action Handlers ----
+  // ---- Game Actions ----
 
   private handleBid(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-    const game = this.hub.getGameByPlayer(auth.playerId);
-    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '游戏不存在' } });
-
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
     const score = payload?.score ?? 0;
-    const { events, error } = game.bid(auth.playerId, score);
+    const { events, error } = game.bid(s.playerId, score);
     if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
-    this.dispatchAndCheckAI(game.room, events);
+    this.dispatchEvents(game.room, events);
   }
 
   private handleDouble(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-    const game = this.hub.getGameByPlayer(auth.playerId);
-    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '游戏不存在' } });
-
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
     const level = payload?.level ?? 0;
-    const { events, error } = game.double(auth.playerId, level);
+    const { events, error } = game.double(s.playerId, level);
     if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
-    this.dispatchAndCheckAI(game.room, events);
+    this.dispatchEvents(game.room, events);
   }
 
   private handlePlay(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-    const game = this.hub.getGameByPlayer(auth.playerId);
-    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '游戏不存在' } });
-
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
     const cards = payload?.cards ?? [];
-    const { events, error } = game.play(auth.playerId, cards);
+    const { events, error } = game.play(s.playerId, cards);
     if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
-    this.dispatchAndCheckAI(game.room, events);
+    this.dispatchEvents(game.room, events);
   }
 
-  private handlePass(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-    const game = this.hub.getGameByPlayer(auth.playerId);
-    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '游戏不存在' } });
-
-    const { events, error } = game.pass(auth.playerId);
+  private handlePass() {
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
+    const { events, error } = game.pass(s.playerId);
     if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
-    this.dispatchAndCheckAI(game.room, events);
+    this.dispatchEvents(game.room, events);
   }
 
-  private handleHint(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-    const game = this.hub.getGameByPlayer(auth.playerId);
-    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '游戏不存在' } });
-
-    const { cards, error } = game.hint(auth.playerId);
+  private handleHint() {
+    const s = this.state!;
+    const game = this.hub.getGameByPlayer(s.playerId);
+    if (!game) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Game not found' } });
+    const { cards, error } = game.hint(s.playerId);
     if (error) return this.send({ type: S2C.ERROR, payload: { code: 400, message: error } });
     this.send({ type: S2C.HINT_RESULT, payload: { cards } });
   }
 
   private handleReconnect(payload: any) {
-    const auth = this.requireAuth()!;
-    if (!auth) return;
-
-    const roomId = payload?.roomId || this.hub.playerRooms.get(auth.playerId);
-    if (!roomId) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '未找到之前的房间' } });
-
+    const s = this.state!;
+    const roomId = payload?.roomId || this.hub.playerRooms.get(s.playerId);
+    if (!roomId) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'No room found' } });
     const room = this.hub.rooms.get(roomId);
-    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: '房间已不存在' } });
+    if (!room) return this.send({ type: S2C.ERROR, payload: { code: 400, message: 'Room gone' } });
 
-    room.setPlayerOnline(auth.playerId, true);
-    this.hub.playerRooms.set(auth.playerId, roomId);
+    room.setPlayerOnline(s.playerId, true);
+    this.hub.playerRooms.set(s.playerId, roomId);
+    this.registerInRoom(roomId, s.playerId);
 
-    this.sendFullState(room, auth.playerId);
-
-    const player = room.getPlayer(auth.playerId);
+    this.sendFullState(room);
+    const player = room.getPlayer(s.playerId);
     if (player) {
       this.broadcastToRoom(roomId, {
         type: S2C.PLAYER_RECONNECTED,
-        payload: { seat: player.seat, playerName: auth.playerName },
+        payload: { seat: player.seat, playerName: s.playerName },
       });
     }
   }
 
-  private dispatchAndCheckAI(room: Room, events: { type: string; payload: any }[]) {
+  // ---- Helpers ----
+
+  private dispatchEvents(room: Room, events: { type: string; payload: any }[]) {
     for (const ev of events) {
       this.broadcastToRoom(room.id, ev);
     }
-    // After human action, check if next turn is AI
     this.hub.scheduleNextIfAI(room.id);
   }
 
-  private sendFullState(room: Room, playerId: string) {
+  private sendFullState(room: Room) {
+    const s = this.state!;
     const state = room.game;
-    const player = room.getPlayer(playerId);
+    const player = room.getPlayer(s.playerId);
     const hand = player ? sortCards(player.hand) : [];
 
     this.send({
       type: S2C.ROOM_STATE,
       payload: {
-        roomId: room.id,
-        phase: state.phase,
-        seat: player?.seat,
-        hand,
+        roomId: room.id, phase: state.phase, seat: player?.seat, hand,
         players: this.hub.buildPlayerListPayload(room),
         bottomCards: (state.phase !== GamePhase.Waiting && state.phase !== GamePhase.Bidding) ? state.bottomCards : [],
-        currentTurnSeat: state.currentTurnSeat,
-        lastPlaySeat: state.lastPlaySeat,
-        lastPlayCards: state.lastPlayCards,
-        landlordSeat: state.landlordSeat,
-        baseScore: state.baseScore,
-        multiplier: state.multiplier,
+        currentTurnSeat: state.currentTurnSeat, lastPlaySeat: state.lastPlaySeat,
+        lastPlayCards: state.lastPlayCards, landlordSeat: state.landlordSeat,
+        baseScore: state.baseScore, multiplier: state.multiplier,
       },
     });
   }

@@ -83,7 +83,7 @@
       <div class="room-header-bar">
         <button class="btn btn-sm btn-outline" @click="leaveRoom">离开</button>
         <div class="room-id-badge">房间 <strong>{{ roomId }}</strong></div>
-        <button class="btn btn-sm btn-ai" @click="addAI" :disabled="roomPlayers.length >= 3">
+        <button class="btn btn-sm btn-ai" @click="addAI" :disabled="roomPlayers.filter(p => p).length >= 3">
           + AI玩家
         </button>
       </div>
@@ -109,8 +109,8 @@
 
       <div class="room-actions">
         <p class="room-status">{{ roomStatus }}</p>
-        <button class="btn btn-primary btn-lg" @click="playerReady" :disabled="readySent">
-          {{ readySent ? '已准备' : '准备' }}
+        <button class="btn btn-primary btn-lg" @click="playerReady">
+          {{ readyState ? '取消准备' : '准备' }}
         </button>
       </div>
 
@@ -125,7 +125,7 @@
 
     <!-- Bottom cards display -->
     <div v-if="bottomCards.length" class="bottom-cards-bar">
-      底牌: <span v-for="c in bottomCards" :key="c" class="mini-card">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+      底牌: <span v-for="c in bottomCards" :key="c" class="mini-card">{{ cd(c).rank }}{{ cd(c).suit }}</span>
     </div>
 
     <div class="game-layout">
@@ -138,20 +138,20 @@
         </div>
         <div class="opp-count">{{ getPlayerHandCount(leftSeat) }}张</div>
         <div v-if="leftPlayed.length" class="opp-played">
-          <span v-for="c in leftPlayed" :key="c" class="tiny-card" :class="cardDisplay(c).cls">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+          <span v-for="c in leftPlayed" :key="c" class="tiny-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
         </div>
       </div>
 
       <!-- Center play area -->
       <div class="center-play-area">
         <div class="played-row" v-if="leftPlayed.length">
-          <span v-for="c in leftPlayed" :key="c" class="played-card" :class="cardDisplay(c).cls">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+          <span v-for="c in leftPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
         </div>
         <div class="played-row" v-if="rightPlayed.length">
-          <span v-for="c in rightPlayed" :key="c" class="played-card" :class="cardDisplay(c).cls">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+          <span v-for="c in rightPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
         </div>
         <div class="played-row my-played" v-if="myPlayed.length">
-          <span v-for="c in myPlayed" :key="c" class="played-card" :class="cardDisplay(c).cls">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+          <span v-for="c in myPlayed" :key="c" class="played-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
         </div>
         <div class="turn-hint" v-if="currentTurn !== null">
           {{ currentTurn === mySeat ? '轮到你出牌' : '等待 ' + getPlayerName(currentTurn) + ' 出牌...' }}
@@ -167,7 +167,7 @@
         </div>
         <div class="opp-count">{{ getPlayerHandCount(rightSeat) }}张</div>
         <div v-if="rightPlayed.length" class="opp-played">
-          <span v-for="c in rightPlayed" :key="c" class="tiny-card" :class="cardDisplay(c).cls">{{ cardDisplay(c).rank }}{{ cardDisplay(c).suit }}</span>
+          <span v-for="c in rightPlayed" :key="c" class="tiny-card" :class="cd(c).cls">{{ cd(c).rank }}{{ cd(c).suit }}</span>
         </div>
       </div>
     </div>
@@ -184,10 +184,10 @@
     <!-- Hand cards -->
     <div class="hand-area" v-if="myHand.length > 0">
       <div class="hand-cards-row">
-        <div v-for="c in myHand" :key="c" class="card-el" :class="[cardDisplay(c).cls, { selected: selectedCards.has(c) }]"
+        <div v-for="c in myHand" :key="c" class="card-el" :class="[cd(c).cls, { selected: selectedCards.has(c) }]"
              @click="toggleCard(c)">
-          <span class="card-rank">{{ cardDisplay(c).rank }}</span>
-          <span class="card-suit">{{ cardDisplay(c).suit }}</span>
+          <span class="card-rank">{{ cd(c).rank }}</span>
+          <span class="card-suit">{{ cd(c).suit }}</span>
         </div>
       </div>
     </div>

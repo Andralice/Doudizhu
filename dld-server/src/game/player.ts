@@ -17,8 +17,8 @@ export function createPlayer(id: string, name: string, isAI = false, aiPlayer?: 
     name,
     seat: -1,
     hand: [],
-    online: !isAI, // AI is always "online"
-    ready: !isAI, // AI is always ready
+    online: true,
+    ready: isAI, // AI is auto-ready, humans must click "准备"
     isAI,
     aiPlayer,
   };

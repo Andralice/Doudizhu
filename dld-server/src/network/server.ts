@@ -11,13 +11,15 @@ export class Server {
   private wss: WebSocketServer;
   private clients: Map<WebSocket, Client> = new Map();
   private roomSockets: Map<string, Set<WebSocket>> = new Map();
+  // Map ws -> playerId for game_start targeting
+  private wsPlayerIds: Map<WebSocket, string> = new Map();
 
   constructor(port: number) {
     this.hub = new Hub();
 
-    // Wire broadcast callback into hub
-    this.hub.broadcast = (roomId, msg, senderWs) => {
-      this.broadcastToRoom(roomId, msg, senderWs);
+    // Wire broadcast into hub — used for broadcasting game events to room
+    this.hub.broadcast = (roomId, msg, _senderWs) => {
+      this.broadcastToRoom(roomId, msg);
     };
 
     const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -41,7 +43,6 @@ export class Server {
       };
       const ext = path.extname(filePath);
       const contentType = extMap[ext] || 'text/plain';
-
       fs.readFile(filePath, (err, data) => {
         if (err) { res.writeHead(404); res.end('Not Found'); return; }
         res.writeHead(200, { 'Content-Type': contentType });
@@ -55,13 +56,24 @@ export class Server {
       const client = new Client(this.hub, ws);
       this.clients.set(ws, client);
 
-      // Auto-join room sockets when player joins a room
-      // We detect room join by watching for ROOM_JOINED messages
-      const originalSend = (client as any).send;
-      // Instead, track via client message processing: when room_joined/player_joined happens
+      // Callbacks for room management
+      client.onRegisterInRoom((roomId, playerId) => {
+        if (!this.roomSockets.has(roomId)) {
+          this.roomSockets.set(roomId, new Set());
+        }
+        this.roomSockets.get(roomId)!.add(ws);
+        this.wsPlayerIds.set(ws, playerId);
+      });
+
+      client.onUnregisterFromRoom((roomId) => {
+        const sockets = this.roomSockets.get(roomId);
+        if (sockets) sockets.delete(ws);
+        this.wsPlayerIds.delete(ws);
+      });
 
       ws.on('close', () => {
-        this.removeClientFromRooms(ws);
+        for (const [, sockets] of this.roomSockets) { sockets.delete(ws); }
+        this.wsPlayerIds.delete(ws);
         this.clients.delete(ws);
       });
     });
@@ -73,42 +85,26 @@ export class Server {
     });
   }
 
-  // Called by hub.broadcast and client.broadcastToRoom
-  private broadcastToRoom(roomId: string, msg: { type: string; payload: any }, senderWs?: WebSocket) {
-    // Track room membership: when a player joins a room, add their socket
-    if (msg.type === S2C.ROOM_JOINED && msg.payload.roomId && senderWs) {
-      if (!this.roomSockets.has(msg.payload.roomId)) {
-        this.roomSockets.set(msg.payload.roomId, new Set());
-      }
-      this.roomSockets.get(msg.payload.roomId)!.add(senderWs);
-    }
-
+  private broadcastToRoom(roomId: string, msg: { type: string; payload: any }) {
     const sockets = this.roomSockets.get(roomId);
-    if (!sockets) return;
+    if (!sockets || sockets.size === 0) return;
 
-    // For game_start, each player only sees their own hand
+    // For game_start: each human player only sees their own hand
     if (msg.type === 'game_start') {
       const hands = msg.payload.hands as number[][];
+      const room = this.hub.rooms.get(roomId);
+      if (!room) return;
+
       for (const ws of sockets) {
-        const client = this.clients.get(ws);
-        if (!client) continue;
-        // Access client's internal state to get player info
-        const room = this.hub.rooms.get(roomId);
-        if (!room) continue;
-        // Find this player's seat by matching WebSocket to playerId
-        // We iterate to find the right player
-        for (const p of room.players) {
-          if (!p || p.isAI) continue;
-          const pRoom = this.hub.playerRooms.get(p.id);
-          if (pRoom === roomId && ws.readyState === WebSocket.OPEN) {
-            ws.send(buildMessage('game_start', {
-              hand: hands[p.seat],
-              handCounts: hands.map((h: number[]) => h.length),
-              bidStartSeat: msg.payload.bidStartSeat,
-            }));
-            break;
-          }
-        }
+        if (ws.readyState !== WebSocket.OPEN) continue;
+        const playerId = this.wsPlayerIds.get(ws);
+        const player = playerId ? room.getPlayer(playerId) : null;
+        const seat = player?.seat ?? 0;
+        ws.send(buildMessage('game_start', {
+          hand: hands[seat] || [],
+          handCounts: hands.map((h: number[]) => h.length),
+          bidStartSeat: msg.payload.bidStartSeat,
+        }));
       }
       return;
     }
@@ -118,12 +114,6 @@ export class Server {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(data);
       }
-    }
-  }
-
-  private removeClientFromRooms(ws: WebSocket) {
-    for (const [, sockets] of this.roomSockets) {
-      sockets.delete(ws);
     }
   }
 }
