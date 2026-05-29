@@ -10,164 +10,128 @@
 </head>
 <body>
 <div id="app">
-  <!-- Toast -->
-  <div class="toast"></div>
+  <div class="toast" id="toast"></div>
 
-  <!-- ===== Login Screen ===== -->
-  <div id="screen-login" class="screen-login" style="display:flex">
-    <div class="login-card">
-      <div class="login-logo">🃏</div>
+  <!-- Login -->
+  <div id="screen-login" class="fullscreen flex-center" style="display:flex">
+    <div class="card-panel login-panel">
+      <div class="logo-icon">🃏</div>
       <h1>斗地主</h1>
-      <p class="login-subtitle">输入账号和昵称开始游戏</p>
-      <div class="form-group">
-        <label>账号</label>
-        <input id="input-login-account" placeholder="输入账号（如手机号或英文名）" maxlength="20" onkeyup="if(event.key==='Enter')window.doLogin()">
-      </div>
-      <div class="form-group">
-        <label>昵称</label>
-        <input id="input-login-name" placeholder="游戏内显示名称" maxlength="8" onkeyup="if(event.key==='Enter')window.doLogin()">
-      </div>
-      <button class="btn btn-primary btn-lg" onclick="window.doLogin()">进入游戏</button>
-      <p id="login-error" class="error-text"></p>
-      <p id="login-auto" class="info-text" style="display:none">自动登录中...</p>
+      <p class="subtitle">欢乐斗地主 · 经典玩法</p>
+      <div class="field"><label>账号</label><input id="login-account" placeholder="输入账号" maxlength="20" onkeyup="if(event.key==='Enter')doLogin()"></div>
+      <div class="field"><label>昵称</label><input id="login-name" placeholder="游戏昵称" maxlength="8" onkeyup="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn primary full" id="login-btn" onclick="doLogin()">进入游戏</button>
+      <p id="login-error" class="err"></p>
+      <p id="login-auto" class="hint" style="display:none">自动登录中...</p>
     </div>
   </div>
 
-  <!-- ===== Home Screen ===== -->
-  <div id="screen-home" class="screen-home" style="display:none">
-    <div class="home-container">
-      <div class="home-header">
-        <div>
-          <h1>🃏 斗地主</h1>
-          <p class="user-info"><span id="home-player-name"></span> · <span id="home-account-id"></span></p>
-        </div>
-        <button class="btn btn-sm btn-outline" onclick="window.logout()">退出</button>
+  <!-- Home -->
+  <div id="screen-home" class="fullscreen" style="display:none">
+    <div class="home-wrap">
+      <div class="top-bar">
+        <div><h1 class="title-sm">🃏 斗地主</h1><p id="home-user" class="sm-text"></p></div>
+        <button class="btn ghost sm" onclick="logout()">退出</button>
       </div>
-      <div class="card-panel">
-        <h3>创建房间</h3>
-        <button class="btn btn-primary btn-lg" onclick="window.doCreateRoom()">创建新房间</button>
-      </div>
-      <div class="card-panel">
-        <h3>加入房间</h3>
-        <div class="join-row">
-          <input id="input-join-room" placeholder="输入6位房间号" maxlength="6" inputmode="numeric" onkeyup="if(event.key==='Enter')window.doJoinRoom()">
-          <button class="btn btn-secondary" onclick="window.doJoinRoom()">加入</button>
-        </div>
-      </div>
-      <div class="card-panel" id="history-panel">
-        <h3>历史战绩</h3>
-        <div class="history-list" id="history-list"></div>
-      </div>
-      <p id="home-error" class="error-text"></p>
+      <div class="card-panel"><button class="btn primary full big" onclick="doCreateRoom()">创建新房间</button></div>
+      <div class="card-panel"><h3>加入房间</h3><div class="row"><input id="join-input" placeholder="6位房间号" maxlength="6" inputmode="numeric" onkeyup="if(event.key==='Enter')doJoinRoom()"><button class="btn secondary" onclick="doJoinRoom()">加入</button></div></div>
+      <div class="card-panel" id="history-panel" style="display:none"><h3>历史战绩</h3><div id="history-list" class="hlist"></div></div>
+      <p id="home-error" class="err"></p>
     </div>
   </div>
 
-  <!-- ===== Room Screen ===== -->
-  <div id="screen-room" class="screen-room" style="display:none">
-    <div class="room-container">
-      <div class="room-header-bar">
-        <button class="btn btn-sm btn-outline" onclick="window.doLeaveRoom()">离开</button>
-        <div class="room-id-badge">房间 <strong id="room-id-display"></strong></div>
-        <button id="btn-add-ai" class="btn btn-sm btn-ai" onclick="window.doAddAI()">+ AI玩家</button>
+  <!-- Room -->
+  <div id="screen-room" class="fullscreen" style="display:none">
+    <div class="room-wrap">
+      <div class="top-bar">
+        <button class="btn ghost sm" onclick="doLeaveRoom()">← 离开</button>
+        <div class="room-tag">房间 <b id="room-id"></b></div>
+        <button id="add-ai-btn" class="btn ai sm" onclick="doAddAI()">+AI</button>
       </div>
-      <div class="player-grid">
-        <div id="room-slot-0" class="player-slot"></div>
-        <div id="room-slot-1" class="player-slot"></div>
-        <div id="room-slot-2" class="player-slot"></div>
+      <div class="seat-list">
+        <div id="seat-0" class="seat"></div>
+        <div id="seat-1" class="seat"></div>
+        <div id="seat-2" class="seat"></div>
       </div>
-      <div class="room-actions">
-        <p class="room-status" id="room-status"></p>
-        <button id="btn-ready" class="btn btn-lg btn-primary" onclick="window.doToggleReady()">准备</button>
+      <div class="room-foot">
+        <p id="room-status" class="dim center"></p>
+        <button id="ready-btn" class="btn primary full big" onclick="doToggleReady()">准备</button>
       </div>
-      <p id="room-error" class="error-text"></p>
+      <p id="room-error" class="err center"></p>
     </div>
   </div>
 
-  <!-- ===== Game Screen ===== -->
-  <div id="screen-game" class="screen-game" style="display:none">
-    <div class="game-phase-bar" id="phase-bar"></div>
-    <div class="bottom-cards-bar" id="bottom-cards-bar" style="display:none"></div>
+  <!-- Game -->
+  <div id="screen-game" class="fullscreen game-screen" style="display:none">
+    <div id="game-phase" class="phase-bar"></div>
+    <div id="bottom-bar" class="bottom-bar" style="display:none"></div>
 
-    <div class="game-layout">
-      <!-- Left opponent -->
-      <div class="opponent-area left">
-        <div class="opp-avatar">?</div>
-        <div class="opp-name" id="name-left">等待</div>
-        <div class="opp-role" id="role-left" style="display:none"></div>
-        <div class="opp-count" id="count-left">0张</div>
-        <div class="opp-played" id="tiny-left" style="display:none"></div>
+    <div class="game-grid">
+      <div class="ply ply-left" id="ply-left">
+        <div class="ply-avatar" id="av-left">?</div>
+        <div class="ply-name" id="nm-left"></div>
+        <div class="ply-role" id="rl-left"></div>
+        <div class="ply-count" id="ct-left">0张</div>
+        <div class="ply-tiny" id="ty-left"></div>
       </div>
 
-      <!-- Center -->
-      <div class="center-play-area">
-        <div class="played-row" id="played-left-cards"></div>
-        <div class="played-row" id="played-right-cards"></div>
-        <div class="played-row my-played" id="played-mine-cards"></div>
-        <div class="turn-hint" id="turn-indicator"></div>
+      <div class="play-zone">
+        <div class="pz-row" id="pz-left"></div>
+        <div class="pz-row" id="pz-right"></div>
+        <div class="pz-row mine" id="pz-mine"></div>
+        <div id="turn-hint" class="turn-hint"></div>
       </div>
 
-      <!-- Right opponent -->
-      <div class="opponent-area right">
-        <div class="opp-avatar">?</div>
-        <div class="opp-name" id="name-right">等待</div>
-        <div class="opp-role" id="role-right" style="display:none"></div>
-        <div class="opp-count" id="count-right">0张</div>
-        <div class="opp-played" id="tiny-right" style="display:none"></div>
+      <div class="ply ply-right" id="ply-right">
+        <div class="ply-avatar" id="av-right">?</div>
+        <div class="ply-name" id="nm-right"></div>
+        <div class="ply-role" id="rl-right"></div>
+        <div class="ply-count" id="ct-right">0张</div>
+        <div class="ply-tiny" id="ty-right"></div>
       </div>
     </div>
 
-    <!-- My info bar -->
-    <div class="my-info-bar">
-      <span id="my-info-name"></span>
-      <span id="my-info-role" class="my-role" style="display:none"></span>
-      <span id="my-info-count">0张</span>
+    <div class="my-bar">
+      <span id="my-name"></span>
+      <span id="my-role"></span>
+      <span id="my-count">0张</span>
     </div>
 
-    <!-- Hand -->
-    <div class="hand-area" id="hand-area">
-      <div class="hand-cards-row" id="hand-cards-row"></div>
+    <div class="hand-wrap" id="hand-wrap">
+      <div class="hand-row" id="hand-row"></div>
     </div>
 
-    <!-- Action buttons -->
-    <div class="action-bar">
-      <button class="btn btn-play" id="btn-play" onclick="window.doPlay()" disabled>出牌</button>
-      <button class="btn btn-pass" id="btn-pass" onclick="window.doPass()" disabled>不出</button>
-      <button class="btn btn-hint" id="btn-hint" onclick="window.doHint()" disabled>提示</button>
+    <div class="act-bar">
+      <button class="btn play-btn" id="btn-play" onclick="doPlay()">出牌</button>
+      <button class="btn pass-btn" id="btn-pass" onclick="doPass()">不出</button>
+      <button class="btn hint-btn" id="btn-hint" onclick="doHint()">提示</button>
     </div>
 
-    <!-- Bidding overlay -->
-    <div class="overlay" id="overlay-bid" style="display:none">
-      <div class="overlay-box">
-        <p id="bid-message"></p>
-        <div class="bid-btns">
-          <button class="btn btn-secondary bid-btn" data-score="0" onclick="window.doBid(0)">不叫</button>
-          <button class="btn btn-primary bid-btn" data-score="1" onclick="window.doBid(1)">1分</button>
-          <button class="btn btn-primary bid-btn" data-score="2" onclick="window.doBid(2)">2分</button>
-          <button class="btn btn-danger bid-btn" data-score="3" onclick="window.doBid(3)">3分</button>
-        </div>
+    <!-- Overlays -->
+    <div class="overlay" id="ov-bid" style="display:none"><div class="ov-box">
+      <p id="bid-msg"></p>
+      <div class="ov-btns">
+        <button class="btn secondary" onclick="doBid(0)">不叫</button>
+        <button class="btn primary" onclick="doBid(1)">1分</button>
+        <button class="btn primary" onclick="doBid(2)">2分</button>
+        <button class="btn danger" onclick="doBid(3)">3分</button>
       </div>
-    </div>
+    </div></div>
 
-    <!-- Doubling overlay -->
-    <div class="overlay" id="overlay-double" style="display:none">
-      <div class="overlay-box">
-        <p>选择加倍</p>
-        <div class="bid-btns">
-          <button class="btn btn-secondary" onclick="window.doDouble(0)">不加倍</button>
-          <button class="btn btn-primary" onclick="window.doDouble(1)">加倍</button>
-          <button class="btn btn-danger" onclick="window.doDouble(2)">超级加倍</button>
-        </div>
+    <div class="overlay" id="ov-double" style="display:none"><div class="ov-box">
+      <p>选择加倍</p>
+      <div class="ov-btns">
+        <button class="btn secondary" onclick="doDouble(0)">不加倍</button>
+        <button class="btn primary" onclick="doDouble(1)">加倍</button>
+        <button class="btn danger" onclick="doDouble(2)">超级加倍</button>
       </div>
-    </div>
+    </div></div>
 
-    <!-- Result overlay -->
-    <div class="overlay" id="overlay-result" style="display:none">
-      <div class="overlay-box">
-        <h2 id="result-title"></h2>
-        <p id="result-details"></p>
-        <button class="btn btn-primary btn-lg" onclick="window.doContinue()">继续</button>
-      </div>
-    </div>
+    <div class="overlay" id="ov-result" style="display:none"><div class="ov-box">
+      <h2 id="res-title"></h2>
+      <p id="res-detail"></p>
+      <button class="btn primary big" onclick="doContinue()">继续</button>
+    </div></div>
   </div>
 </div>
 <script src="app.js"></script>
